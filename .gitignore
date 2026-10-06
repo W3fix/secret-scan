@@ -1,0 +1,4 @@
+node_modules/
+# Personal terms to detect. Never commit this file; the scanner refuses to run if it is tracked.
+.secret-scan.local.json
+*.sarif

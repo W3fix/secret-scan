@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default; jobs widen only what they need.
+permissions:
+  contents: read
+
+jobs:
+  # {{Secret scan job: wire in the W3Fix secret-scan action once it is published.}}
+
+  test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      # Pin every action to a full commit SHA with the version in a comment.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # {{Language setup, lint, test, build.}}
