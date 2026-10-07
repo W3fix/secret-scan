@@ -24,6 +24,40 @@ jobs:
           persist-credentials: false
       - uses: ./
 
+  action-catches-a-leak:
+    name: Action fails on a planted secret
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Built at runtime from the test fakes; never a literal in this repo.
+      - name: Plant a fake secret and a private term
+        run: |
+          PYTHONPATH=. python3 -c "from tests import fakes; print('token = ' + repr(fakes.github_token()))" > planted.py
+          echo "Owner: Northwind Traders" > planted.txt
+          git add planted.py planted.txt
+      - id: scan
+        uses: ./
+        continue-on-error: true
+        with:
+          private-terms: Northwind Traders
+          sarif: planted.sarif
+      - name: Require failure, findings, and no leaked values
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          test "$OUTCOME" = failure || { echo "::error::the action passed despite a planted secret"; exit 1; }
+          python3 - <<'PY'
+          import json
+          from tests import fakes
+          sarif = open("planted.sarif").read()
+          rules = sorted(r["ruleId"] for r in json.loads(sarif)["runs"][0]["results"])
+          assert rules == ["github-token", "private-term"], rules
+          assert fakes.github_token() not in sarif and "Northwind" not in sarif
+          print("ok:", rules)
+          PY
+
   test:
     name: Lint, types & tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
