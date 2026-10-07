@@ -1,0 +1,69 @@
+[project]
+name = "w3fix-secret-scan"
+dynamic = ["version"]
+description = "Secret and personal-data scanner that never prints what it finds. CLI, pre-commit hook, and GitHub Action."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Jason K. Fulton" }]
+keywords = ["secrets", "security", "pre-commit", "github-actions", "devsecops"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
+# Deliberately empty. The scanner reads every file in a repository; each
+# runtime dependency would be supply-chain surface in exactly that place.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/W3fix/secret-scan"
+Issues = "https://github.com/W3fix/secret-scan/issues"
+
+[project.scripts]
+secret-scan = "secret_scan.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/secret_scan/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/secret_scan"]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.14", "mypy>=1.18"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S", "PTH", "C4"]
+ignore = [
+    # subprocess calls run `git` with argument lists, never a shell.
+    "S603", "S607",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use assert, temp paths and throwaway subprocesses by design.
+"tests/**" = ["S101", "S108", "S311"]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
