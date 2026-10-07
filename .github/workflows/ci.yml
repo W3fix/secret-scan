@@ -52,7 +52,14 @@ jobs:
           import json
           from tests import fakes
           sarif = open("planted.sarif").read()
-          rules = sorted(r["ruleId"] for r in json.loads(sarif)["runs"][0]["results"])
+          results = json.loads(sarif)["runs"][0]["results"]
+          # The term also appears in this workflow file, which is correctly flagged too;
+          # count only the planted files.
+          rules = sorted(
+              r["ruleId"]
+              for r in results
+              if r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].startswith("planted.")
+          )
           assert rules == ["github-token", "private-term"], rules
           assert fakes.github_token() not in sarif and "Northwind" not in sarif
           print("ok:", rules)
