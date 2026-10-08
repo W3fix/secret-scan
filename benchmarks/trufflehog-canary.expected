@@ -1,0 +1,5 @@
+# trufflehog-canary @ 0416560b1330d8ac42045813251d85c688717eaf. Written by scripts/benchmark.py --update.
+keys:3 url-embedded-credentials
+keys:6 private-key
+new_key:2 aws-access-key-id
+new_key:3 aws-secret-access-key

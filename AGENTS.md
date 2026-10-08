@@ -6,7 +6,10 @@ The definition of "ready" is `../w3fix-utils/STANDARDS.md`.
 ## This tool
 
 - **Purpose:** scan files for credentials and personal data without ever printing what it finds.
-- **Local check before any PR:** `scripts/check.sh` (format, lint, types, tests, self-scan).
+- **Local check before any PR:** `scripts/check.sh` (format, lint, types, tests, self-scan, benchmark).
+- **Benchmark:** `scripts/benchmark.py` compares findings on pinned public corpora with
+  `benchmarks/*.expected`. A rule change that moves those numbers updates the expected
+  files with `--update` in the same PR, so the reviewer sees exactly which findings changed.
 - **Python:** pyenv provides the interpreters (`.python-version` pins 3.11 for development).
   Create the venv from it, `uv venv --python "$(pyenv which python)"`, so uv doesn't
   download its own. Supported range: 3.10+. Test 3.10 before changing syntax.

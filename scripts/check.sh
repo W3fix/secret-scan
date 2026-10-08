@@ -7,3 +7,5 @@ uv run ruff check .
 uv run mypy
 uv run pytest -q
 uv run secret-scan
+# Fetches the pinned corpora on first run, then reuses .benchmarks/.
+uv run python scripts/benchmark.py
