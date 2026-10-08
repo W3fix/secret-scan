@@ -60,7 +60,9 @@ _PLACEHOLDER = re.compile(
     r"example|sample|placeholder|dummy|your[_-]?|change[_-]?me|redacted|replace[_-]?me"
     r"|x{4,}|\*{3,}|\.\.\.|[<>]|\$\{|\$\(|\{\{|%\("
     # The whole value is an interpolation: f"{expr}", "{0}", $VAR, %s.
-    r"|\A(?:\{[^{}]+\}|\$[A-Za-z_][A-Za-z0-9_]*|%[sd])\Z",
+    r"|\A(?:\{[^{}]+\}|\$[A-Za-z_][A-Za-z0-9_]*|%[sd])\Z"
+    # The whole value is the word for what belongs there: user:password@host.
+    r"|\A(?:pass(?:word)?|pwd|secret|token)\Z",
     re.IGNORECASE,
 )
 
@@ -146,7 +148,9 @@ CONTENT_RULES: tuple[Rule, ...] = (
     _rule(
         "url-embedded-credentials",
         "Credentials inside a URL leak into logs, shell history and error messages.",
-        r"(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'\"]{1,64}:(?P<secret>[^\s:/@'\"]{6,128})"
+        # No minimum password length: short defaults such as admin:admin are the
+        # credentials most worth catching.
+        r"(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'\"]{1,64}:(?P<secret>[^\s:/@'\"]{1,128})"
         r"@[A-Za-z0-9.-]+",
     ),
     _rule(

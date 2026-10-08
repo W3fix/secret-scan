@@ -65,6 +65,44 @@ jobs:
           print("ok:", rules)
           PY
 
+  truffle-canary:
+    name: Catches everything in TruffleHog's canary repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Public, deliberately leaked test keys (trufflesecurity/test_keys), pinned so the
+      # expected findings can't drift. A failure here means a rule got narrower.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: trufflesecurity/test_keys
+          ref: 0416560b1330d8ac42045813251d85c688717eaf
+          path: canary
+          persist-credentials: false
+      - name: Require every known finding
+        env:
+          PYTHONPATH: src
+        run: |
+          set +e
+          python3 -m secret_scan --format json canary > canary.json
+          status=$?
+          set -e
+          test "$status" = 1 || { echo "::error::expected exit 1 (findings), got $status"; exit 1; }
+          python3 - <<'PY'
+          import json
+          findings = json.load(open("canary.json"))["findings"]
+          found = sorted((f["path"].removeprefix("canary/"), f["rule"]) for f in findings)
+          expected = [
+              ("keys", "private-key"),
+              ("keys", "url-embedded-credentials"),
+              ("new_key", "aws-access-key-id"),
+              ("new_key", "aws-secret-access-key"),
+          ]
+          assert found == expected, found
+          print("ok:", found)
+          PY
+
   test:
     name: Lint, types & tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest

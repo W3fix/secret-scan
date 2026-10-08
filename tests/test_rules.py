@@ -36,6 +36,8 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
         lambda: f"Server=db.internal;Database=app;User Id=svc;Password={fakes.password()};",
     ),
     ("url-embedded-credentials", lambda: f"postgres://svc:{fakes.password()}@db.internal/app"),
+    # Short default credentials; TruffleHog's canary repo has one this rule used to miss.
+    ("url-embedded-credentials", lambda: "https://" + "admin:" + "admin@db.internal/"),
     ("github-token", lambda: f"token: {fakes.github_token()}"),
     ("github-token", lambda: fakes.github_fine_grained()),
     ("gitlab-token", lambda: fakes.gitlab_token()),
@@ -71,6 +73,8 @@ def test_every_content_rule_has_a_positive_case() -> None:
         'secret = "aaaaaaaaaaaaaaaaaaaa"',  # long but no entropy
         "connect(host=h, password=db_password_value)",  # kwargs, not a connection string
         "https://user:${PASSWORD}@example.com",
+        "https://user:password@db.internal/",  # documentation stand-in
+        "ssh://git@github.com:22/org/repo.git",  # user and port, no password
         "Password=${DB_PASSWORD};Server=db;",
         "-----BEGIN PUBLIC KEY-----",
         'conn = f"Server=db;User Id=app;Password={settings.db_password};"',  # f-string

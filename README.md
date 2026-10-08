@@ -241,14 +241,32 @@ environment variables, so an input value can't inject shell commands.
 runtime from seeded random characters (`tests/fakes.py`). Otherwise this
 repository would fail its own scan and trip every other scanner that looks at it.
 
-### Compared with gitleaks and TruffleHog
+### Compared with TruffleHog and gitleaks
 
-Use them if you need what they do best: hundreds of provider-specific rules,
-full-history scanning, and (TruffleHog) live verification of whether a
-credential still works. secret-scan is deliberately smaller. It focuses on
-the commit gate, never echoes what it finds, treats personal data as a
-first-class concern, and keeps a rule set short enough to read in one sitting.
-Running it alongside one of them is reasonable.
+TruffleHog is the benchmark this tool measures itself against. Run on the same
+files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
+
+| | secret-scan | TruffleHog |
+|---|---|---|
+| Secret types | 21 rules, each with a written reason | 800+ detectors |
+| Checks whether a credential is live | No (no network calls) | Yes, against the provider's API |
+| Git history, orgs, S3, images | Current files only | Yes |
+| Encoded secrets (base64 and similar) | No | Yes |
+| Detector precision | Shape matching; looser, so more false positives | Structural checks (key pairs, parsed key bodies) |
+| Prints the matched value | Never | By default |
+| Personal data, `.env`, Terraform state | Yes | No |
+| Fails the run on a finding | By default | Only with `--fail` |
+| License | MIT | AGPL-3.0 |
+
+On TruffleHog's public canary repository (`trufflesecurity/test_keys`), secret-scan
+finds everything in the current files: the private key, the AWS key pair, and a
+URL with `admin:admin` credentials. CI checks this on every change. TruffleHog also
+finds a further secret in that repository's history, which secret-scan doesn't read.
+
+If you need breadth, history or verification, use TruffleHog or gitleaks.
+secret-scan is the commit gate: it never echoes what it finds, treats personal
+data as a first-class concern, and keeps a rule set short enough to read in one
+sitting. Running it alongside one of them is reasonable.
 
 ## Limitations
 
