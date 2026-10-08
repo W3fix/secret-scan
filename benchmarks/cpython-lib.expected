@@ -1,0 +1,19 @@
+# cpython-lib @ cbc944f4bc59639a444dd971c737788ba2283a91. Written by scripts/benchmark.py --update.
+Lib/test/certdata/allsans.pem:1 private-key
+Lib/test/certdata/badcert.pem:1 private-key
+Lib/test/certdata/badcert.pem:19 private-key
+Lib/test/certdata/badkey.pem:1 private-key
+Lib/test/certdata/badkey.pem:21 private-key
+Lib/test/certdata/idnsans.pem:1 private-key
+Lib/test/certdata/keycert.passwd.pem:1 private-key
+Lib/test/certdata/keycert.pem:1 private-key
+Lib/test/certdata/keycert2.pem:1 private-key
+Lib/test/certdata/keycert3.pem:1 private-key
+Lib/test/certdata/keycert4.pem:1 private-key
+Lib/test/certdata/keycertecc.pem:1 private-key
+Lib/test/certdata/leaf-missing-aki.keycert.pem:3 private-key
+Lib/test/certdata/nosan.pem:1 private-key
+Lib/test/certdata/pycakey.pem:1 private-key
+Lib/test/certdata/ssl_key.passwd.pem:1 private-key
+Lib/test/certdata/ssl_key.pem:1 private-key
+Lib/test/test_urllib2net.py:111 url-embedded-credentials
