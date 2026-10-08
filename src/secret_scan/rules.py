@@ -114,7 +114,12 @@ CONTENT_RULES: tuple[Rule, ...] = (
         "private-key",
         "Private key material must never be in source control. Deleting it later "
         "doesn't remove it from history.",
-        r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----",
+        r"(?P<secret>-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?"
+        r"PRIVATE KEY(?: BLOCK)?-----)"
+        # Only when key material follows: a header alone is documentation or a
+        # truncated example. Newlines may be real or escaped (JSON, .env), and PEM
+        # and PGP headers such as Proc-Type: or Version: may come first.
+        r"(?=(?:\s|\\[rn])+(?:[A-Za-z-]+:[^\n\\]*(?:\s|\\[rn])+)*[A-Za-z0-9+/]{40})",
         check_placeholder=False,
     ),
     _rule(
