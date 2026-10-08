@@ -6,11 +6,17 @@ The definition of "ready" is `../w3fix-utils/STANDARDS.md`.
 ## This tool
 
 - **Purpose:** scan files for credentials and personal data without ever printing what it finds.
-- **Local check before any PR:** `npm run check` (format/lint, tests, and a self-scan).
-- **Runtime dependencies:** none, and it stays that way. The scanner reads every file
-  in a repository, so each dependency would be supply-chain surface in exactly the place
-  it should be smallest. Dev-only tooling is fine.
-- **Never print a matched value:** not in output, errors, test failure messages, or debug logs.
-  Tests check this.
-- **Fake secrets in tests are built at runtime** (`'AKIA' + 'X'.repeat(16)`), never written
-  as literals. Otherwise the repository fails its own scan, and other scanners flag it too.
+- **Local check before any PR:** `scripts/check.sh` (format, lint, types, tests, self-scan).
+- **Python:** pyenv provides the interpreters (`.python-version` pins 3.11 for development).
+  Create the venv from it, `uv venv --python "$(pyenv which python)"`, so uv doesn't
+  download its own. Supported range: 3.10+. Test 3.10 before changing syntax.
+- **Runtime dependencies:** none, and it stays that way. The scanner reads every file in
+  a repository, so each dependency would be supply-chain surface in exactly the place it
+  should be smallest. Dev tooling (pytest, ruff, mypy) is fine.
+- **Never output a matched value:** not in reports, errors, notes, test failure messages
+  or debug logs. `Finding` has no field for it on purpose; don't add one.
+  `test_no_output_ever_contains_a_matched_value` must keep passing.
+- **Fake secrets in tests are built at runtime** (`tests/fakes.py`), never written as
+  literals. Otherwise this repository fails its own scan and trips other scanners.
+- **New rules** need a `why`, a positive test in `tests/test_rules.py::POSITIVES`, and
+  at least one look-alike that must stay quiet.

@@ -1,0 +1,8 @@
+- id: secret-scan
+  name: secret-scan
+  description: Scan staged content for credentials and personal data. Never prints matched values.
+  entry: secret-scan --staged
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]

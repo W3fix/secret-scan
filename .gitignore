@@ -1,4 +1,12 @@
-node_modules/
-# Personal terms to detect. Never commit this file; the scanner refuses to run if it is tracked.
+# Private terms. Never commit this file; the scanner refuses to run if it's tracked.
 .secret-scan.local.json
 *.sarif
+
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

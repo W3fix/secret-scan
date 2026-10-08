@@ -1,0 +1,52 @@
+name: W3Fix secret-scan
+description: Scan for credentials and personal data. Reports where, never what.
+author: Jason K. Fulton
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  since:
+    description: >-
+      Scan only files changed since this git ref (for example the pull request's
+      base SHA). Leave empty to scan every tracked file.
+    required: false
+    default: ""
+  config:
+    description: Path to the repository config. Defaults to .secret-scan.json at the root.
+    required: false
+    default: ""
+  sarif:
+    description: >-
+      Also write SARIF to this path, for github/codeql-action/upload-sarif.
+      Leave empty to skip.
+    required: false
+    default: ""
+  private-terms:
+    description: >-
+      Private terms to flag, one per line. Pass a secret here, never a literal:
+      the point is to keep these out of the repository.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Runs the code at the ref you pinned, straight from the action's checkout:
+    # no pip install and no network access. Inputs reach the script through
+    # environment variables, never by interpolation into the script text,
+    # so an input can't inject shell commands.
+    - name: Scan
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}/src
+        SECRET_SCAN_PRIVATE_TERMS: ${{ inputs.private-terms }}
+        INPUT_SINCE: ${{ inputs.since }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_SARIF: ${{ inputs.sarif }}
+      run: |
+        args=(--no-user-config)
+        if [ -n "$INPUT_SINCE" ]; then args+=(--since "$INPUT_SINCE"); fi
+        if [ -n "$INPUT_CONFIG" ]; then args+=(--config "$INPUT_CONFIG"); fi
+        if [ -n "$INPUT_SARIF" ]; then args+=(--sarif "$INPUT_SARIF"); fi
+        python3 -m secret_scan "${args[@]}"

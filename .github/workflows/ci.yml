@@ -15,12 +15,117 @@ permissions:
   contents: read
 
 jobs:
-  # {{Secret scan job: wire in the W3Fix secret-scan action once it is published.}}
-
-  test:
-    name: Lint & test
+  self-scan:
+    name: Secret scan (this action, on this repo)
     runs-on: ubuntu-latest
     steps:
-      # Pin every action to a full commit SHA with the version in a comment.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # {{Language setup, lint, test, build.}}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./
+
+  action-catches-a-leak:
+    name: Action fails on a planted secret
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Built at runtime from the test fakes; never a literal in this repo.
+      - name: Plant a fake secret and a private term
+        run: |
+          PYTHONPATH=. python3 -c "from tests import fakes; print('token = ' + repr(fakes.github_token()))" > planted.py
+          echo "Owner: Northwind Traders" > planted.txt
+          git add planted.py planted.txt
+      - id: scan
+        uses: ./
+        continue-on-error: true
+        with:
+          private-terms: Northwind Traders
+          sarif: planted.sarif
+      - name: Require failure, findings, and no leaked values
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          test "$OUTCOME" = failure || { echo "::error::the action passed despite a planted secret"; exit 1; }
+          python3 - <<'PY'
+          import json
+          from tests import fakes
+          sarif = open("planted.sarif").read()
+          results = json.loads(sarif)["runs"][0]["results"]
+          # The term also appears in this workflow file, which is correctly flagged too;
+          # count only the planted files.
+          rules = sorted(
+              r["ruleId"]
+              for r in results
+              if r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].startswith("planted.")
+          )
+          assert rules == ["github-token", "private-term"], rules
+          assert fakes.github_token() not in sarif and "Northwind" not in sarif
+          print("ok:", rules)
+          PY
+
+  truffle-canary:
+    name: Catches everything in TruffleHog's canary repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Public, deliberately leaked test keys (trufflesecurity/test_keys), pinned so the
+      # expected findings can't drift. A failure here means a rule got narrower.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: trufflesecurity/test_keys
+          ref: 0416560b1330d8ac42045813251d85c688717eaf
+          path: canary
+          persist-credentials: false
+      - name: Require every known finding
+        env:
+          PYTHONPATH: src
+        run: |
+          set +e
+          python3 -m secret_scan --format json canary > canary.json
+          status=$?
+          set -e
+          test "$status" = 1 || { echo "::error::expected exit 1 (findings), got $status"; exit 1; }
+          python3 - <<'PY'
+          import json
+          findings = json.load(open("canary.json"))["findings"]
+          found = sorted((f["path"].removeprefix("canary/"), f["rule"]) for f in findings)
+          expected = [
+              ("keys", "private-key"),
+              ("keys", "url-embedded-credentials"),
+              ("new_key", "aws-access-key-id"),
+              ("new_key", "aws-secret-access-key"),
+          ]
+          assert found == expected, found
+          print("ok:", found)
+          PY
+
+  test:
+    name: Lint, types & tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install (locked)
+        run: uv sync --locked
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Types
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest
+      - name: Build
+        run: uv build
