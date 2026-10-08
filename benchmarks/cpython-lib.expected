@@ -16,4 +16,3 @@ Lib/test/certdata/nosan.pem:1 private-key
 Lib/test/certdata/pycakey.pem:1 private-key
 Lib/test/certdata/ssl_key.passwd.pem:1 private-key
 Lib/test/certdata/ssl_key.pem:1 private-key
-Lib/test/test_urllib2net.py:111 url-embedded-credentials
