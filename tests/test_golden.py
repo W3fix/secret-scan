@@ -48,7 +48,7 @@ def test_json(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
 def test_sarif(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     sarif = leaky_repo.parent / "out.sarif"
     assert main(["--quiet", "--sarif", str(sarif)]) == 1
-    _check("findings.sarif", sarif.read_text())
+    _check("findings.sarif.json", sarif.read_text())
 
 
 def test_github_annotations(
