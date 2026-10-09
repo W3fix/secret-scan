@@ -19,7 +19,31 @@ def rules_hit(text: str, tmp_path: Path) -> list[str]:
 
 
 POSITIVES: list[tuple[str, Callable[[], str]]] = [
-    ("private-key", lambda: fakes.private_key_header() + "\nMIIE..."),
+    ("private-key", lambda: f"{fakes.private_key_header()}\n{fakes.private_key_body()}\n"),
+    ("private-key", lambda: f"{fakes.private_key_header()}\r\n{fakes.private_key_body()}\r\n"),
+    # Escaped newlines, as in a cloud service-account JSON file.
+    (
+        "private-key",
+        lambda: f'"private_key": "{fakes.private_key_header("")}\\n{fakes.private_key_body()}\\n"',
+    ),
+    # Encrypted PEM and PGP put headers before the body.
+    (
+        "private-key",
+        lambda: (
+            f"{fakes.private_key_header()}\nProc-Type: 4,ENCRYPTED\n"
+            f"DEK-Info: AES-128-CBC,0000\n\n{fakes.private_key_body()}\n"
+        ),
+    ),
+    (
+        "private-key",
+        lambda: (
+            f"{fakes.private_key_header('PGP ')}\nVersion: GnuPG v2\n\n{fakes.private_key_body()}\n"
+        ),
+    ),
+    (
+        "private-key",
+        lambda: f"{fakes.private_key_header('OPENSSH ')}\n    {fakes.private_key_body()}\n",
+    ),
     ("aws-access-key-id", lambda: f"key = {fakes.aws_key_id()}"),
     ("aws-secret-access-key", lambda: f"aws_secret_access_key = {fakes.aws_secret()}"),
     (
@@ -92,6 +116,10 @@ def test_every_content_rule_has_a_positive_case() -> None:
         "export CONN='Server=db;User Id=app;Password=$DB_PASSWORD;'",  # shell variable
         'url = f"postgres://app:{password}@db.internal/orders"',
         "-----BEGIN CERTIFICATE-----",
+        # A private-key header with no key material after it.
+        fakes.private_key_header(),
+        fakes.private_key_header() + "\nMIIE...\n",  # truncated documentation example
+        fakes.private_key_header() + "\nBad Key, though the cert should be OK\n",
     ],
 )
 def test_look_alikes_stay_quiet(text: str, tmp_path: Path) -> None:
