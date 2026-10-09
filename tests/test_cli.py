@@ -28,22 +28,6 @@ def run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
     return code, out, err
 
 
-@pytest.fixture
-def leaky_repo(repo: Path, git: GitRun) -> Path:
-    lines = [
-        f"GITHUB = '{fakes.github_token()}'",
-        f"AWS = '{fakes.aws_key_id()}'",
-        f"CONN = 'AccountName=demo;AccountKey={fakes.storage_key()}'",
-        f"ENTRA = '{fakes.entra_secret()}'",
-        f"DB = 'Server=db;User Id=svc;Password={fakes.password()};'",
-        f"CLAUDE = '{fakes.anthropic_key()}'",
-        "OWNER = 'Contoso Pharmaceuticals'",
-    ]
-    (repo / "settings.py").write_text("\n".join(lines) + "\n")
-    git("add", ".")
-    return repo
-
-
 def test_clean_repo_exits_zero(repo: Path, git: GitRun, capsys: pytest.CaptureFixture[str]) -> None:
     (repo / "a.py").write_text("print('hello')\n")
     git("add", ".")
@@ -187,3 +171,18 @@ def test_install_hook_refuses_to_overwrite(repo: Path, capsys: pytest.CaptureFix
     assert code == 2 and "--force" in err
     assert "mine" in hook.read_text()
     assert run(capsys, "--install-hook", "--force")[0] == 0
+
+
+def test_module_entry_point(leaky_repo: Path) -> None:
+    """`python -m secret_scan` is exactly what the GitHub Action runs."""
+    proc = subprocess.run(
+        [sys.executable, "-m", "secret_scan"],
+        cwd=leaky_repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 1, proc.stderr
+    assert "6 findings" in proc.stdout
+    for secret in ALL_SECRETS:
+        assert secret not in proc.stdout + proc.stderr

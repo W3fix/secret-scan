@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests import fakes
+
 GitRun = Callable[..., str]
 
 
@@ -42,3 +44,19 @@ def git(repo: Path) -> GitRun:
         ).stdout
 
     return run
+
+
+@pytest.fixture
+def leaky_repo(repo: Path, git: GitRun) -> Path:
+    lines = [
+        f"GITHUB = '{fakes.github_token()}'",
+        f"AWS = '{fakes.aws_key_id()}'",
+        f"CONN = 'AccountName=demo;AccountKey={fakes.storage_key()}'",
+        f"ENTRA = '{fakes.entra_secret()}'",
+        f"DB = 'Server=db;User Id=svc;Password={fakes.password()};'",
+        f"CLAUDE = '{fakes.anthropic_key()}'",
+        "OWNER = 'Contoso Pharmaceuticals'",
+    ]
+    (repo / "settings.py").write_text("\n".join(lines) + "\n")
+    git("add", ".")
+    return repo

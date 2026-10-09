@@ -95,3 +95,35 @@ def test_walk_skips_tool_directories(tmp_path: Path) -> None:
 def test_walk_missing_path(tmp_path: Path) -> None:
     with pytest.raises(SecretScanError, match="no such file"):
         list(walk_paths([tmp_path / "nope"], tmp_path))
+
+
+def test_walk_explicit_file(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("x")
+    (tmp_path / "b.txt").write_text("y")
+    assert set(contents(walk_paths([tmp_path / "a.txt"], tmp_path))) == {"a.txt"}
+
+
+def test_paths_outside_the_base_are_reported_absolute(tmp_path: Path) -> None:
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "a.txt").write_text("x")
+    base = tmp_path / "base"
+    base.mkdir()
+    (found,) = contents(walk_paths([other], base))
+    assert found == (other / "a.txt").resolve().as_posix()
+
+
+def test_changed_since_skips_deleted_files(repo: Path, git: GitRun) -> None:
+    (repo / "keep.txt").write_text("a")
+    (repo / "gone.txt").write_text("b")
+    git("add", ".")
+    git("commit", "-qm", "base")
+    (repo / "gone.txt").unlink()
+    (repo / "keep.txt").write_text("changed")
+    assert set(contents(changed_since(repo, "HEAD"))) == {"keep.txt"}
+
+
+def test_missing_git_is_a_clean_error(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATH", "")
+    with pytest.raises(SecretScanError, match="git is not installed"):
+        list(tracked_files(repo))

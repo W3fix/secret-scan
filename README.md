@@ -272,6 +272,9 @@ sitting. Running it alongside one of them is reasonable.
 
 - It scans the current content of files, **not git history**. To check history,
   use gitleaks or TruffleHog, or run secret-scan across checkouts.
+- The generic `password = "…"` rule flags descriptive values in documentation, such as
+  `SuperSecretToken`, on purpose: they look exactly like weak real passwords. Allow them
+  with a reason.
 - Pattern matching catches the mistakes people actually make, not a determined
   attempt to hide something (encoding, splitting a key across lines).
 - Binary files and files over 2 MiB skip content rules. File-name rules still

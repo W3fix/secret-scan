@@ -1,0 +1,20 @@
+settings.py:1:11  github-token  (40 chars)
+    A GitHub token can read or write repositories and act as its owner.
+settings.py:2:8  aws-access-key-id  (20 chars)
+    An AWS access key ID is half of a usable credential and names the account it belongs to.
+settings.py:3:37  azure-storage-account-key  (88 chars)
+    A storage account shared key grants full control of the account and can't be scoped.
+settings.py:4:10  azure-entra-client-secret  (40 chars)
+    An Entra ID client secret lets anyone authenticate as the application.
+settings.py:5:38  connection-string-password  (15 chars)
+    A password inside a connection string is a live database credential.
+settings.py:6:11  anthropic-api-key  (106 chars)
+    An Anthropic API key is billed to its organization and can read its workspace data.
+
+✗ 6 findings in 1 file (1 file scanned). Values withheld.
+::error file=settings.py,line=1,col=11,title=secret-scan%3A github-token::A GitHub token can read or write repositories and act as its owner. (40 chars; value withheld)
+::error file=settings.py,line=2,col=8,title=secret-scan%3A aws-access-key-id::An AWS access key ID is half of a usable credential and names the account it belongs to. (20 chars; value withheld)
+::error file=settings.py,line=3,col=37,title=secret-scan%3A azure-storage-account-key::A storage account shared key grants full control of the account and can't be scoped. (88 chars; value withheld)
+::error file=settings.py,line=4,col=10,title=secret-scan%3A azure-entra-client-secret::An Entra ID client secret lets anyone authenticate as the application. (40 chars; value withheld)
+::error file=settings.py,line=5,col=38,title=secret-scan%3A connection-string-password::A password inside a connection string is a live database credential. (15 chars; value withheld)
+::error file=settings.py,line=6,col=11,title=secret-scan%3A anthropic-api-key::An Anthropic API key is billed to its organization and can read its workspace data. (106 chars; value withheld)

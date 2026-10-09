@@ -1,0 +1,21 @@
+private-key                  content  builtin  Private key material must never be in source control. Deleting it later doesn't remove it from history.
+aws-access-key-id            content  builtin  An AWS access key ID is half of a usable credential and names the account it belongs to.
+aws-secret-access-key        content  builtin  An AWS secret access key grants everything its user or role can do.
+azure-storage-account-key    content  builtin  A storage account shared key grants full control of the account and can't be scoped.
+azure-sas-token              content  builtin  A SAS token is a bearer credential. Anyone holding the URL has its access until it expires.
+azure-entra-client-secret    content  builtin  An Entra ID client secret lets anyone authenticate as the application.
+connection-string-password   content  builtin  A password inside a connection string is a live database credential.
+url-embedded-credentials     content  builtin  Credentials inside a URL leak into logs, shell history and error messages.
+github-token                 content  builtin  A GitHub token can read or write repositories and act as its owner.
+gitlab-token                 content  builtin  A GitLab personal access token acts as its owner across the instance.
+slack-token                  content  builtin  A Slack token grants workspace access as a bot or user.
+slack-webhook                content  builtin  A Slack webhook URL lets anyone post into the channel as the integration.
+stripe-live-key              content  builtin  A live Stripe secret or restricted key can move real money.
+google-api-key               content  builtin  A Google API key is billed to its project and often has no usage restrictions.
+npm-token                    content  builtin  An npm token can publish packages as its owner: a direct supply-chain risk.
+anthropic-api-key            content  builtin  An Anthropic API key is billed to its organization and can read its workspace data.
+openai-api-key               content  builtin  An OpenAI API key is billed to its organization and can read its project data.
+generic-assigned-secret      content  builtin  A secret assigned inline as a literal is almost always a real one pasted in.
+dotenv-file                  path     builtin  Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead.
+terraform-state              path     builtin  Terraform state stores resource attributes in plain text, including generated passwords and keys. Use a remote backend.
+key-material-file            path     builtin  Key stores, certificate bundles and SSH identity files usually contain private keys.

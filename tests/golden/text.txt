@@ -1,0 +1,14 @@
+settings.py:1:11  github-token  (40 chars)
+    A GitHub token can read or write repositories and act as its owner.
+settings.py:2:8  aws-access-key-id  (20 chars)
+    An AWS access key ID is half of a usable credential and names the account it belongs to.
+settings.py:3:37  azure-storage-account-key  (88 chars)
+    A storage account shared key grants full control of the account and can't be scoped.
+settings.py:4:10  azure-entra-client-secret  (40 chars)
+    An Entra ID client secret lets anyone authenticate as the application.
+settings.py:5:38  connection-string-password  (15 chars)
+    A password inside a connection string is a live database credential.
+settings.py:6:11  anthropic-api-key  (106 chars)
+    An Anthropic API key is billed to its organization and can read its workspace data.
+
+✗ 6 findings in 1 file (1 file scanned). Values withheld.
