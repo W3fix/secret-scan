@@ -157,7 +157,9 @@ def walk_paths(paths: list[Path], base: Path) -> Iterator[Candidate]:
 
 
 def _rel(path: Path, base: Path) -> str:
-    resolved = path.resolve()
+    # Resolve the directory but not the name itself: resolving a symlink would
+    # swap it for its target, which then gets scanned as if it were a file here.
+    resolved = path.parent.resolve() / path.name
     try:
         return resolved.relative_to(base.resolve()).as_posix()
     except ValueError:
