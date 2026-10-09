@@ -118,8 +118,10 @@ CONTENT_RULES: tuple[Rule, ...] = (
         r"PRIVATE KEY(?: BLOCK)?-----)"
         # Only when key material follows: a header alone is documentation or a
         # truncated example. Newlines may be real or escaped (JSON, .env), and PEM
-        # and PGP headers such as Proc-Type: or Version: may come first.
-        r"(?=(?:\s|\\[rn])+(?:[A-Za-z-]+:[^\n\\]*(?:\s|\\[rn])+)*[A-Za-z0-9+/]{40})",
+        # and PGP headers such as Proc-Type: or Version: may come first. Each
+        # header runs to the end of its line, so a line splits into headers only
+        # one way; letting a header end at any space backtracks exponentially.
+        r"(?=(?:\s|\\[rn])+(?:[A-Za-z-]+:[^\n\\]*(?:\n|\\n)(?:\s|\\[rn])*)*[A-Za-z0-9+/]{40})",
         check_placeholder=False,
     ),
     _rule(
