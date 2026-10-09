@@ -92,6 +92,22 @@ def test_walk_skips_tool_directories(tmp_path: Path) -> None:
     assert found == {"src/a.py", ".terraform/modules/m/main.tf"}
 
 
+def test_symlinks_are_not_followed(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("x")
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "real.txt").write_text("y")
+    try:
+        (root / "link.txt").symlink_to(outside / "secret.txt")
+        (root / "linkdir").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("this platform can't create symlinks without privileges")
+    assert set(contents(walk_paths([root], root))) == {"real.txt"}
+    assert contents(walk_paths([root / "link.txt"], root)) == {}
+
+
 def test_walk_missing_path(tmp_path: Path) -> None:
     with pytest.raises(SecretScanError, match="no such file"):
         list(walk_paths([tmp_path / "nope"], tmp_path))
