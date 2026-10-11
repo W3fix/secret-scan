@@ -68,6 +68,10 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
         "url-embedded-credentials",
         lambda: f"https://svc:{fakes.password()}@example.com.contoso.net/",
     ),
+    (
+        "aws-access-key-id",
+        lambda: f"Credential={fakes.aws_key_id()}/20240101/us-east-1/s3/aws4_request",
+    ),
     ("github-token", lambda: f"token: {fakes.github_token()}"),
     ("github-token", lambda: fakes.github_fine_grained()),
     ("gitlab-token", lambda: fakes.gitlab_token()),
@@ -116,6 +120,9 @@ def test_every_content_rule_has_a_positive_case() -> None:
         "export CONN='Server=db;User Id=app;Password=$DB_PASSWORD;'",  # shell variable
         'url = f"postgres://app:{password}@db.internal/orders"',
         "-----BEGIN CERTIFICATE-----",
+        # An AWS-shaped run inside a base64 blob.
+        "data:application/wasm;base64,Ym9v" + fakes.aws_key_id() + "dGVz",
+        "AGFzbQEA+" + fakes.aws_key_id() + "+AAAB",
         # A private-key header with no key material after it.
         fakes.private_key_header(),
         fakes.private_key_header() + "\nMIIE...\n",  # truncated documentation example

@@ -127,7 +127,10 @@ CONTENT_RULES: tuple[Rule, ...] = (
     _rule(
         "aws-access-key-id",
         "An AWS access key ID is half of a usable credential and names the account it belongs to.",
-        r"(?<![A-Z0-9])(?P<secret>(?:AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16})(?![A-Z0-9])",
+        # Bounded by anything but base64, so a matching run inside an encoded blob
+        # (inlined WASM, images) doesn't count. A trailing / is allowed: SigV4
+        # credential scopes put one right after the key ID.
+        r"(?<![A-Za-z0-9+/])(?P<secret>(?:AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16})(?![A-Za-z0-9+])",
     ),
     _rule(
         "aws-secret-access-key",
