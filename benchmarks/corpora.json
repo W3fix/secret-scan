@@ -1,0 +1,23 @@
+[
+  {
+    "name": "trufflehog-canary",
+    "why": "Keys TruffleHog's authors leaked on purpose. Every one must be found.",
+    "repo": "https://github.com/trufflesecurity/test_keys",
+    "commit": "0416560b1330d8ac42045813251d85c688717eaf",
+    "paths": ["."]
+  },
+  {
+    "name": "cpython-lib",
+    "why": "Python 3.13.16 standard library: ordinary code, plus real test keys under Lib/test/certdata.",
+    "repo": "https://github.com/python/cpython",
+    "commit": "cbc944f4bc59639a444dd971c737788ba2283a91",
+    "paths": ["Lib"]
+  },
+  {
+    "name": "node-types",
+    "why": "Node.js type definitions: documentation-heavy and full of example URLs.",
+    "repo": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "commit": "fa817f124291dc323e21eca7f252c8ca8bc4d204",
+    "paths": ["types/node"]
+  }
+]

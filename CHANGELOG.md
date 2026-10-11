@@ -13,3 +13,5 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 - Inline `secret-scan:allow <reason>` on the line or the line above.
 - Output as text, JSON, and SARIF 2.1.0; GitHub annotations when running in Actions.
 - `--install-hook` for a git pre-commit hook, a pre-commit framework hook, and a composite GitHub Action.
+- `scripts/benchmark.py`: scans pinned public corpora (TruffleHog's canary keys, the CPython standard library,
+  Node.js type definitions) and fails on any new or missing finding. Runs in CI.
