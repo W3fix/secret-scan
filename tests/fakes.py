@@ -88,8 +88,13 @@ def openai_key() -> str:
     return "sk-" + "proj-" + chars(ALNUM + "_-", 48, seed=79)
 
 
-def private_key_header() -> str:
-    return "-----BEGIN " + "RSA PRIVATE KEY-----"
+def private_key_header(kind: str = "RSA ") -> str:
+    return "-----BEGIN " + kind + "PRIVATE KEY" + ("" if kind != "PGP " else " BLOCK") + "-----"
+
+
+def private_key_body() -> str:
+    """One line of PEM body: 64 base64 characters."""
+    return chars(B64, 64, seed=97)
 
 
 def generic_value() -> str:
