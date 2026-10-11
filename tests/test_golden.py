@@ -26,13 +26,16 @@ def _normalise(text: str) -> str:
 
 
 def _check(name: str, actual: str) -> None:
+    # Explicit UTF-8: Windows reads files in its legacy code page by default.
     path = GOLDEN / name
     actual = _normalise(actual)
     if os.environ.get("UPDATE_GOLDEN"):
         path.parent.mkdir(exist_ok=True)
-        path.write_text(actual)
+        path.write_text(actual, encoding="utf-8")
     assert path.exists(), f"missing {path.name}; run with UPDATE_GOLDEN=1"
-    assert actual == path.read_text(), f"{path.name} changed; review, then UPDATE_GOLDEN=1"
+    assert actual == path.read_text(encoding="utf-8"), (
+        f"{path.name} changed; review, then UPDATE_GOLDEN=1"
+    )
 
 
 def test_text(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -48,7 +51,7 @@ def test_json(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
 def test_sarif(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     sarif = leaky_repo.parent / "out.sarif"
     assert main(["--quiet", "--sarif", str(sarif)]) == 1
-    _check("findings.sarif.json", sarif.read_text())
+    _check("findings.sarif.json", sarif.read_text(encoding="utf-8"))
 
 
 def test_github_annotations(
