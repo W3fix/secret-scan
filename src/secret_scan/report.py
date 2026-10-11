@@ -22,6 +22,18 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+def _marks(out: TextIO) -> tuple[str, str]:
+    """Pass and fail marks the stream can actually encode.
+
+    Windows pipes and consoles often use a legacy code page without ✓ or ✗.
+    """
+    try:
+        "✓✗".encode(getattr(out, "encoding", None) or "utf-8")
+    except (UnicodeEncodeError, LookupError):
+        return "OK", "X"
+    return "✓", "✗"
+
+
 def _measure(f: Finding) -> str:
     return "file name" if f.line is None else f"{f.length} chars"
 
@@ -62,16 +74,19 @@ def write_text(
         out.write(s.yellow(f"skipped (larger than {settings.max_file_bytes} bytes): {path}") + "\n")
     if quiet and not result.findings:
         return
+    passed, failed = _marks(out)
     files = len({f.path for f in result.findings})
     scanned = _plural(result.files_scanned, "file") + " scanned"
     if result.findings:
         out.write(
             "\n"
-            + s.red(f"✗ {_plural(len(result.findings), 'finding')} in {_plural(files, 'file')}")
+            + s.red(
+                f"{failed} {_plural(len(result.findings), 'finding')} in {_plural(files, 'file')}"
+            )
             + f" ({scanned}). Values withheld.\n"
         )
     else:
-        out.write(s.green("✓ No findings") + f" ({scanned}).\n")
+        out.write(s.green(f"{passed} No findings") + f" ({scanned}).\n")
 
 
 def _gh_escape_data(text: str) -> str:

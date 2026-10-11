@@ -137,9 +137,19 @@ def install_hook(root: Path, force: bool, out: TextIO) -> int:
     return EXIT_CLEAN
 
 
+def _never_raise_on_encoding(stream: TextIO) -> TextIO:
+    # A character the console can't encode (a custom rule's reason, a path)
+    # would otherwise crash with exit 1, which reads as "findings"; on a clean
+    # repository that blocks every commit. Replace it instead.
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="replace")
+    return stream
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    out, err = sys.stdout, sys.stderr
+    out, err = _never_raise_on_encoding(sys.stdout), _never_raise_on_encoding(sys.stderr)
     try:
         cwd = Path.cwd()
         found = git_root(cwd)
