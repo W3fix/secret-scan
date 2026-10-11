@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 uv run ruff format --check .
 uv run ruff check .
 uv run mypy
-uv run pytest -q
+uv run coverage run -m pytest -q
+uv run coverage report
 uv run secret-scan
 # Fetches the pinned corpora on first run, then reuses .benchmarks/.
 uv run python scripts/benchmark.py

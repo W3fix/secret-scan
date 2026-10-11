@@ -84,6 +84,14 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
     ("openai-api-key", lambda: fakes.openai_key()),
     ("generic-assigned-secret", lambda: f'api_key = "{fakes.generic_value()}"'),
     ("generic-assigned-secret", lambda: f'"client_secret": "{fakes.generic_value()}"'),
+    # Deliberately caught, though both come from documentation: a descriptive value
+    # looks exactly like a weak real password, and missing one of those is worse
+    # than a reviewed exception. Decided 2026-10-08; see README Limitations.
+    ("generic-assigned-secret", lambda: "'X-TOKEN-SECRET': '" + "Super" + "SecretToken'"),
+    (
+        "generic-assigned-secret",
+        lambda: "password = '" + "a_password_having" + "_at_least_32_chars'",
+    ),
 ]
 
 

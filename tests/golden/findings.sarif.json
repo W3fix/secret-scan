@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "secret-scan",
+          "version": "<version>",
+          "informationUri": "https://github.com/W3fix/secret-scan",
+          "rules": [
+            {
+              "id": "private-key",
+              "shortDescription": {
+                "text": "Private key material must never be in source control. Deleting it later doesn't remove it from history."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "aws-access-key-id",
+              "shortDescription": {
+                "text": "An AWS access key ID is half of a usable credential and names the account it belongs to."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "aws-secret-access-key",
+              "shortDescription": {
+                "text": "An AWS secret access key grants everything its user or role can do."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "azure-storage-account-key",
+              "shortDescription": {
+                "text": "A storage account shared key grants full control of the account and can't be scoped."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "azure-sas-token",
+              "shortDescription": {
+                "text": "A SAS token is a bearer credential. Anyone holding the URL has its access until it expires."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "azure-entra-client-secret",
+              "shortDescription": {
+                "text": "An Entra ID client secret lets anyone authenticate as the application."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "connection-string-password",
+              "shortDescription": {
+                "text": "A password inside a connection string is a live database credential."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "url-embedded-credentials",
+              "shortDescription": {
+                "text": "Credentials inside a URL leak into logs, shell history and error messages."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "github-token",
+              "shortDescription": {
+                "text": "A GitHub token can read or write repositories and act as its owner."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "gitlab-token",
+              "shortDescription": {
+                "text": "A GitLab personal access token acts as its owner across the instance."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "slack-token",
+              "shortDescription": {
+                "text": "A Slack token grants workspace access as a bot or user."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "slack-webhook",
+              "shortDescription": {
+                "text": "A Slack webhook URL lets anyone post into the channel as the integration."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "stripe-live-key",
+              "shortDescription": {
+                "text": "A live Stripe secret or restricted key can move real money."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "google-api-key",
+              "shortDescription": {
+                "text": "A Google API key is billed to its project and often has no usage restrictions."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "npm-token",
+              "shortDescription": {
+                "text": "An npm token can publish packages as its owner: a direct supply-chain risk."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "anthropic-api-key",
+              "shortDescription": {
+                "text": "An Anthropic API key is billed to its organization and can read its workspace data."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "openai-api-key",
+              "shortDescription": {
+                "text": "An OpenAI API key is billed to its organization and can read its project data."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "generic-assigned-secret",
+              "shortDescription": {
+                "text": "A secret assigned inline as a literal is almost always a real one pasted in."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "dotenv-file",
+              "shortDescription": {
+                "text": "Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "terraform-state",
+              "shortDescription": {
+                "text": "Terraform state stores resource attributes in plain text, including generated passwords and keys. Use a remote backend."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "key-material-file",
+              "shortDescription": {
+                "text": "Key stores, certificate bundles and SSH identity files usually contain private keys."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "github-token",
+          "level": "error",
+          "message": {
+            "text": "A GitHub token can read or write repositories and act as its owner. (40 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 11,
+                  "endColumn": 51
+                }
+              }
+            }
+          ],
+          "ruleIndex": 8
+        },
+        {
+          "ruleId": "aws-access-key-id",
+          "level": "error",
+          "message": {
+            "text": "An AWS access key ID is half of a usable credential and names the account it belongs to. (20 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 8,
+                  "endColumn": 28
+                }
+              }
+            }
+          ],
+          "ruleIndex": 1
+        },
+        {
+          "ruleId": "azure-storage-account-key",
+          "level": "error",
+          "message": {
+            "text": "A storage account shared key grants full control of the account and can't be scoped. (88 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 37,
+                  "endColumn": 125
+                }
+              }
+            }
+          ],
+          "ruleIndex": 3
+        },
+        {
+          "ruleId": "azure-entra-client-secret",
+          "level": "error",
+          "message": {
+            "text": "An Entra ID client secret lets anyone authenticate as the application. (40 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 10,
+                  "endColumn": 50
+                }
+              }
+            }
+          ],
+          "ruleIndex": 5
+        },
+        {
+          "ruleId": "connection-string-password",
+          "level": "error",
+          "message": {
+            "text": "A password inside a connection string is a live database credential. (15 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 5,
+                  "startColumn": 38,
+                  "endColumn": 53
+                }
+              }
+            }
+          ],
+          "ruleIndex": 6
+        },
+        {
+          "ruleId": "anthropic-api-key",
+          "level": "error",
+          "message": {
+            "text": "An Anthropic API key is billed to its organization and can read its workspace data. (106 chars; value withheld)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "settings.py"
+                },
+                "region": {
+                  "startLine": 6,
+                  "startColumn": 11,
+                  "endColumn": 117
+                }
+              }
+            }
+          ],
+          "ruleIndex": 15
+        }
+      ]
+    }
+  ]
+}

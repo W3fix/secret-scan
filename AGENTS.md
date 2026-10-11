@@ -16,6 +16,13 @@ The definition of "ready" is `../w3fix-utils/STANDARDS.md`.
 - **Runtime dependencies:** none, and it stays that way. The scanner reads every file in
   a repository, so each dependency would be supply-chain surface in exactly the place it
   should be smallest. Dev tooling (pytest, ruff, mypy) is fine.
+- **Merging to `main` needs the `CI passed` check** (and CodeQL). `CI passed` succeeds only
+  when every CI job does: lint, types, tests on 3.10–3.14 and on macOS and Windows,
+  coverage at or above the floor in `pyproject.toml`, golden outputs, regex timing,
+  self-scan, the Action's planted-leak test, and the benchmark.
+- **Regression tests to keep in step with changes:** an output change regenerates
+  `tests/golden/` (`UPDATE_GOLDEN=1 uv run pytest tests/test_golden.py`) in the same PR; a
+  new rule must pass `tests/test_regex_safety.py`; the coverage floor only goes up.
 - **Never output a matched value:** not in reports, errors, notes, test failure messages
   or debug logs. `Finding` has no field for it on purpose; don't add one.
   `test_no_output_ever_contains_a_matched_value` must keep passing.

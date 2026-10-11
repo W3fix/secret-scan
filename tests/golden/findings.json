@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "tool": {
+    "name": "secret-scan",
+    "version": "<version>"
+  },
+  "findings": [
+    {
+      "path": "settings.py",
+      "line": 1,
+      "column": 11,
+      "rule": "github-token",
+      "why": "A GitHub token can read or write repositories and act as its owner.",
+      "length": 40
+    },
+    {
+      "path": "settings.py",
+      "line": 2,
+      "column": 8,
+      "rule": "aws-access-key-id",
+      "why": "An AWS access key ID is half of a usable credential and names the account it belongs to.",
+      "length": 20
+    },
+    {
+      "path": "settings.py",
+      "line": 3,
+      "column": 37,
+      "rule": "azure-storage-account-key",
+      "why": "A storage account shared key grants full control of the account and can't be scoped.",
+      "length": 88
+    },
+    {
+      "path": "settings.py",
+      "line": 4,
+      "column": 10,
+      "rule": "azure-entra-client-secret",
+      "why": "An Entra ID client secret lets anyone authenticate as the application.",
+      "length": 40
+    },
+    {
+      "path": "settings.py",
+      "line": 5,
+      "column": 38,
+      "rule": "connection-string-password",
+      "why": "A password inside a connection string is a live database credential.",
+      "length": 15
+    },
+    {
+      "path": "settings.py",
+      "line": 6,
+      "column": 11,
+      "rule": "anthropic-api-key",
+      "why": "An Anthropic API key is billed to its organization and can read its workspace data.",
+      "length": 106
+    }
+  ],
+  "summary": {
+    "findings": 6,
+    "filesScanned": 1,
+    "skippedBinary": 0,
+    "skippedLarge": [],
+    "ignored": 0
+  }
+}

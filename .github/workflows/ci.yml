@@ -99,7 +99,44 @@ jobs:
         run: uv run ruff check .
       - name: Types
         run: uv run mypy
-      - name: Tests
-        run: uv run pytest
+      - name: Tests, with a coverage floor
+        run: |
+          uv run coverage run -m pytest
+          uv run coverage report
       - name: Build
         run: uv build
+
+  test-os:
+    # The hook runs on developers' machines, not only on Linux runners.
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv run pytest
+
+  # The single check branch protection requires. Listing every job there would
+  # mean editing repository settings whenever a job is added or renamed; this
+  # fails unless every job it needs succeeded (skipped or cancelled counts as failed).
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [self-scan, action-catches-a-leak, benchmark, test, test-os]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = success ] || { echo "::error::a required job did not succeed"; exit 1; }
+          done

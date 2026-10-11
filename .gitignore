@@ -13,3 +13,4 @@ build/
 
 # Benchmark corpora fetched by scripts/benchmark.py.
 .benchmarks/
+.coverage
