@@ -87,6 +87,35 @@ def test_text_output_shape(leaky_repo: Path, capsys: pytest.CaptureFixture[str])
     assert "6 findings in 1 file" in out
 
 
+def _run_module(cwd: Path, encoding: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "secret_scan"],
+        cwd=cwd,
+        env={**os.environ, "PYTHONIOENCODING": encoding},
+        capture_output=True,
+        text=True,
+        encoding=encoding,
+        check=False,
+    )
+
+
+def test_legacy_console_encoding_clean(repo: Path, git: GitRun) -> None:
+    """Windows pipes default to cp1252, which has no ✓; a crash there exits 1."""
+    (repo / "a.txt").write_text("nothing here\n")
+    git("add", ".")
+    proc = _run_module(repo, "cp1252")
+    assert (proc.returncode, proc.stderr) == (0, "")
+    assert "OK No findings" in proc.stdout
+
+
+def test_legacy_console_encoding_findings(leaky_repo: Path) -> None:
+    proc = _run_module(leaky_repo, "cp1252")
+    assert (proc.returncode, proc.stderr) == (1, "")
+    assert "X 6 findings in 1 file" in proc.stdout
+    for secret in ALL_SECRETS:
+        assert secret not in proc.stdout
+
+
 def test_json_output(leaky_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _, out, _ = run(capsys, "--format", "json")
     data = json.loads(out)
