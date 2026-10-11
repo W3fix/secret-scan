@@ -100,6 +100,15 @@ def _rule(
     )
 
 
+# Hosts reserved for documentation (RFC 2606): example.com/.net/.org and the
+# .example and .invalid TLDs. Credentials pointing there are illustrations.
+# .test and .localhost are left out: those name real development hosts.
+_DOC_HOST = (
+    r"(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|[a-z0-9-]+\.(?:example|invalid))"
+    r"(?![a-z0-9-]|\.[a-z0-9])"
+)
+
+
 CONTENT_RULES: tuple[Rule, ...] = (
     _rule(
         "private-key",
@@ -148,10 +157,10 @@ CONTENT_RULES: tuple[Rule, ...] = (
     _rule(
         "url-embedded-credentials",
         "Credentials inside a URL leak into logs, shell history and error messages.",
-        # No minimum password length: short defaults such as admin:admin are the
-        # credentials most worth catching.
-        r"(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'\"]{1,64}:(?P<secret>[^\s:/@'\"]{1,128})"
-        r"@[A-Za-z0-9.-]+",
+        # Three characters is enough for short defaults such as admin:admin, the
+        # credentials most worth catching; shorter ones are syntax examples (a:b).
+        r"(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'\"]{1,64}:(?P<secret>[^\s:/@'\"]{3,128})"
+        rf"@(?!{_DOC_HOST})[A-Za-z0-9.-]+",
     ),
     _rule(
         "github-token",
