@@ -93,6 +93,8 @@ def scan_text(path: str, text: str, settings: Settings) -> list[Finding]:
                 continue
             if rule.min_entropy and shannon_entropy(value) < rule.min_entropy:
                 continue
+            if rule.well_formed and not rule.well_formed(value):
+                continue
             line_no, col = lines.locate(start)
             if rule.line_requires and not rule.line_requires.search(lines.line(line_no)):
                 continue
