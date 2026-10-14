@@ -119,6 +119,7 @@ def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
                 "column": f.column,
                 "rule": f.rule,
                 "why": settings.rule_why(f.rule),
+                **({"fix": fix} if (fix := settings.rule_fix(f.rule)) else {}),
                 "length": f.length,
                 **({"note": f.note} if f.note else {}),
             }
@@ -157,6 +158,7 @@ def to_sarif(result: ScanResult, settings: Settings) -> dict[str, Any]:
                             {
                                 "id": r.id,
                                 "shortDescription": {"text": r.why},
+                                **({"help": {"text": r.fix}} if r.fix else {}),
                                 "defaultConfiguration": {"level": "error"},
                                 "properties": {"tags": ["security", "secrets"]},
                             }

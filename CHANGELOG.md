@@ -17,5 +17,7 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
   a 91% branch-coverage floor, tests on macOS and Windows, and a single `CI passed` check.
 - `scripts/benchmark.py`: scans pinned public corpora (TruffleHog's canary keys, the CPython standard library,
   Node.js type definitions) and fails on any new or missing finding. Runs in CI.
+- Every built-in rule says what to do about a committed match (`fix` in JSON, `help` in SARIF);
+  custom rules can add one.
 - Rules can carry a structural check. `github-token` uses GitHub's built-in checksum, so
   token-shaped strings GitHub never issued (test data, minified code) no longer match.

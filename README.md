@@ -162,6 +162,7 @@ nobody can justify shouldn't exist, and the reason is what a reviewer reads.
     {
       "id": "internal-hostname",
       "why": "Internal hostnames reveal network layout.",
+      "fix": "Use the service's public name.",
       "pattern": "\\b[a-z0-9-]+\\.corp\\.contoso\\.com\\b",
       "ignoreCase": true
     }
@@ -171,7 +172,10 @@ nobody can justify shouldn't exist, and the reason is what a reviewer reads.
 ```
 
 Unknown keys, unknown rule ids, missing reasons and invalid patterns are errors,
-not silent no-ops, so a typo can't quietly switch off a check.
+not silent no-ops, so a typo can't quietly switch off a check. A rule's optional
+`fix` says what to do about a committed match. Every built-in rule has one, and it
+appears in JSON (`fix`) and SARIF (`help`), not in the commit-time text output:
+before a commit the secret hasn't left your machine, so there's nothing to revoke.
 
 ### Inline
 

@@ -14,6 +14,9 @@
               "shortDescription": {
                 "text": "Private key material must never be in source control. Deleting it later doesn't remove it from history."
               },
+              "help": {
+                "text": "Treat the key as compromised: generate a new pair, install the new public key or certificate wherever the old one is trusted, then remove the old one. Keep private keys in a secret manager or key vault."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -28,6 +31,9 @@
               "id": "aws-access-key-id",
               "shortDescription": {
                 "text": "An AWS access key ID is half of a usable credential and names the account it belongs to."
+              },
+              "help": {
+                "text": "Deactivate, then delete, the access key in IAM and check CloudTrail for its use. Prefer short-lived credentials: IAM roles, or OIDC federation from CI."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -44,6 +50,9 @@
               "shortDescription": {
                 "text": "An AWS secret access key grants everything its user or role can do."
               },
+              "help": {
+                "text": "Deactivate, then delete, the access key in IAM and check CloudTrail for its use. Prefer short-lived credentials: IAM roles, or OIDC federation from CI."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -58,6 +67,9 @@
               "id": "azure-storage-account-key",
               "shortDescription": {
                 "text": "A storage account shared key grants full control of the account and can't be scoped."
+              },
+              "help": {
+                "text": "Regenerate the key on the storage account (the two keys can be rotated one at a time without downtime) and update its consumers. Prefer Microsoft Entra ID authorization, and disable shared key access where nothing needs it."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -74,6 +86,9 @@
               "shortDescription": {
                 "text": "A SAS token is a bearer credential. Anyone holding the URL has its access until it expires."
               },
+              "help": {
+                "text": "Revoke it: delete or change the stored access policy it uses, or rotate the account key that signed it. Prefer short-lived user delegation SAS issued at run time."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -88,6 +103,9 @@
               "id": "azure-entra-client-secret",
               "shortDescription": {
                 "text": "An Entra ID client secret lets anyone authenticate as the application."
+              },
+              "help": {
+                "text": "Delete the secret from the app registration, check the service principal's sign-in logs, and move to a managed identity or workload identity federation where possible."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -104,6 +122,9 @@
               "shortDescription": {
                 "text": "A password inside a connection string is a live database credential."
               },
+              "help": {
+                "text": "Change the password on the database, then load the connection string from configuration (a Key Vault reference, an environment variable) or use managed identity authentication."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -118,6 +139,9 @@
               "id": "url-embedded-credentials",
               "shortDescription": {
                 "text": "Credentials inside a URL leak into logs, shell history and error messages."
+              },
+              "help": {
+                "text": "Change the password, and pass credentials separately from the URL: an environment variable, a secret store or a credential helper."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -134,6 +158,9 @@
               "shortDescription": {
                 "text": "A GitHub token can read or write repositories and act as its owner."
               },
+              "help": {
+                "text": "Revoke the token (the owner's developer settings, or the organization's token settings), review the audit log for its use, and replace it with a GitHub App or the workflow's GITHUB_TOKEN where possible."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -148,6 +175,9 @@
               "id": "gitlab-token",
               "shortDescription": {
                 "text": "A GitLab personal access token acts as its owner across the instance."
+              },
+              "help": {
+                "text": "Revoke it in the owner's access token settings, review the audit events, and replace it with a project or group token that has an expiry date."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -164,6 +194,9 @@
               "shortDescription": {
                 "text": "A Slack token grants workspace access as a bot or user."
               },
+              "help": {
+                "text": "Revoke it (Slack's auth.revoke method, or the app's OAuth settings) and keep the replacement in a secret store."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -178,6 +211,9 @@
               "id": "slack-webhook",
               "shortDescription": {
                 "text": "A Slack webhook URL lets anyone post into the channel as the integration."
+              },
+              "help": {
+                "text": "Remove the webhook in the Slack app's Incoming Webhooks settings, create a new one, and keep it in a secret store."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -194,6 +230,9 @@
               "shortDescription": {
                 "text": "A live Stripe secret or restricted key can move real money."
               },
+              "help": {
+                "text": "Roll the key in the Stripe Dashboard, review the API request logs for its use, and prefer restricted keys with only the permissions needed."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -208,6 +247,9 @@
               "id": "google-api-key",
               "shortDescription": {
                 "text": "A Google API key is billed to its project and often has no usage restrictions."
+              },
+              "help": {
+                "text": "Delete or regenerate the key on the Google Cloud console's Credentials page, and restrict its replacement to the APIs and applications that need it."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -224,6 +266,9 @@
               "shortDescription": {
                 "text": "An npm token can publish packages as its owner: a direct supply-chain risk."
               },
+              "help": {
+                "text": "Revoke it (npm token revoke, or the Access Tokens page), check recent versions of the owner's packages, and publish from CI with trusted publishing or a granular token."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -238,6 +283,9 @@
               "id": "anthropic-api-key",
               "shortDescription": {
                 "text": "An Anthropic API key is billed to its organization and can read its workspace data."
+              },
+              "help": {
+                "text": "Delete the key in the Anthropic console, check the workspace's usage for activity you don't expect, and issue a replacement held in a secret store."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -254,6 +302,9 @@
               "shortDescription": {
                 "text": "An OpenAI API key is billed to its organization and can read its project data."
               },
+              "help": {
+                "text": "Delete the key on the OpenAI platform's API keys page, check usage for activity you don't expect, and issue a replacement held in a secret store."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -268,6 +319,9 @@
               "id": "generic-assigned-secret",
               "shortDescription": {
                 "text": "A secret assigned inline as a literal is almost always a real one pasted in."
+              },
+              "help": {
+                "text": "If it's a real credential, rotate it where it was issued and load it from the environment or a secret store. If it's test or example data, add an allow entry with the reason."
               },
               "defaultConfiguration": {
                 "level": "error"
@@ -284,6 +338,9 @@
               "shortDescription": {
                 "text": "Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead."
               },
+              "help": {
+                "text": "Stop tracking it (git rm --cached), add it to .gitignore, rotate every secret it held, and commit a .env.example with placeholders instead."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -299,6 +356,9 @@
               "shortDescription": {
                 "text": "Terraform state stores resource attributes in plain text, including generated passwords and keys. Use a remote backend."
               },
+              "help": {
+                "text": "Stop tracking it, rotate the secrets it contains, and move state to a remote backend with encryption and restricted access."
+              },
               "defaultConfiguration": {
                 "level": "error"
               },
@@ -313,6 +373,9 @@
               "id": "key-material-file",
               "shortDescription": {
                 "text": "Key stores, certificate bundles and SSH identity files usually contain private keys."
+              },
+              "help": {
+                "text": "Stop tracking it, replace the keys it holds, and keep key stores in a secret manager or key vault."
               },
               "defaultConfiguration": {
                 "level": "error"
