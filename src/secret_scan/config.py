@@ -76,6 +76,12 @@ class Settings:
                 return r.why
         return ""
 
+    def rule_fix(self, rule_id: str) -> str:
+        for r in self.all_rules:
+            if r.id == rule_id:
+                return r.fix
+        return ""
+
     def is_ignored(self, path: str) -> bool:
         return any(g.match(path) for g in self.ignore)
 
@@ -145,9 +151,10 @@ def _glob(where: str, pattern: str) -> re.Pattern[str]:
 
 
 def _custom_rule(where: str, item: dict[str, Any], origin: str) -> Rule:
-    _check_keys(where, item, {"id", "why", "pattern", "ignoreCase"})
+    _check_keys(where, item, {"id", "why", "fix", "pattern", "ignoreCase"})
     rule_id = _req(where, item, "id")
     why = _req(where, item, "why")
+    fix = _opt(where, item, "fix") or ""
     pattern = _req(where, item, "pattern")
     if not _RULE_ID.match(rule_id):
         raise SecretScanError(
@@ -160,7 +167,7 @@ def _custom_rule(where: str, item: dict[str, Any], origin: str) -> Rule:
         compiled = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
     except re.error as e:
         raise SecretScanError(f"{where}: invalid pattern: {e}") from None
-    return Rule(rule_id, why, compiled, check_placeholder=False, origin=origin)
+    return Rule(rule_id, why, compiled, fix=fix, check_placeholder=False, origin=origin)
 
 
 @dataclass
@@ -193,6 +200,7 @@ def _private_term_rule(terms: list[str]) -> Rule:
         PRIVATE_TERM_RULE_ID,
         "Matches an entry in your private terms list.",
         re.compile(rf"(?<![A-Za-z0-9])(?:{alternation})(?![A-Za-z0-9])", re.IGNORECASE),
+        fix="Remove the personal or client detail, or replace it with a generic name.",
         check_placeholder=False,
         origin="private",
     )

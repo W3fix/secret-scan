@@ -34,6 +34,7 @@ def load(root: Path, **kw: Any) -> Any:
         ({"rules": [{"id": "x", "why": "w", "pattern": "a"}]}, "rule id must be"),
         ({"rules": [{"id": "github-token", "why": "w", "pattern": "a"}]}, "already in use"),
         ({"rules": [{"id": "my-rule", "why": "w", "pattern": "("}]}, "invalid pattern"),
+        ({"rules": [{"id": "my-rule", "why": "w", "fix": "", "pattern": "a"}]}, "'fix' must be"),
         ({"allowList": []}, "unknown key(s) allowList"),
         ({"maxFileBytes": 0}, "positive integer"),
     ],
@@ -96,12 +97,16 @@ def test_custom_rule(tmp_path: Path) -> None:
                     "why": "Internal hostnames reveal network layout.",
                     "pattern": r"\b[a-z0-9-]+\.corp\.contoso\.com\b",
                     "ignoreCase": True,
+                    "fix": "Use the service's public alias.",
                 }
             ]
         },
     )
-    [f] = scan_text("a", "connect to DB01.CORP.CONTOSO.COM now", load(tmp_path))
+    s = load(tmp_path)
+    [f] = scan_text("a", "connect to DB01.CORP.CONTOSO.COM now", s)
     assert f.rule == "internal-host"
+    assert s.rule_fix("internal-host") == "Use the service's public alias."
+    assert s.rule_fix("no-such-rule") == ""
 
 
 def test_private_terms_from_all_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

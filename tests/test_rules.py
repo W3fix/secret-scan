@@ -10,6 +10,9 @@ import pytest
 from secret_scan.config import load_settings
 from secret_scan.rules import (
     CONTENT_RULES,
+    PATH_RULES,
+    PathRule,
+    Rule,
     github_checksum_ok,
     looks_like_placeholder,
     shannon_entropy,
@@ -105,6 +108,13 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
 @pytest.mark.parametrize(("rule", "make"), POSITIVES, ids=[r for r, _ in POSITIVES])
 def test_rule_fires(rule: str, make: Callable[[], str], tmp_path: Path) -> None:
     assert rule in rules_hit(make(), tmp_path)
+
+
+def test_every_builtin_rule_says_what_to_do() -> None:
+    rules: list[Rule | PathRule] = [*CONTENT_RULES, *PATH_RULES]
+    for rule in rules:
+        assert rule.fix.endswith("."), rule.id
+        assert rule.fix != rule.why, rule.id
 
 
 def test_every_content_rule_has_a_positive_case() -> None:
