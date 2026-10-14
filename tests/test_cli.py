@@ -44,7 +44,7 @@ def test_quiet_clean_prints_nothing(
 
 
 @pytest.mark.parametrize("github_actions", [False, True])
-@pytest.mark.parametrize("fmt", ["text", "json"])
+@pytest.mark.parametrize("fmt", ["text", "json", "markdown"])
 def test_no_output_ever_contains_a_matched_value(
     leaky_repo: Path,
     capsys: pytest.CaptureFixture[str],

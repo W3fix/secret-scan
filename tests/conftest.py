@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from collections.abc import Callable, Iterator
@@ -46,8 +47,8 @@ def git(repo: Path) -> GitRun:
     return run
 
 
-@pytest.fixture
-def leaky_repo(repo: Path, git: GitRun) -> Path:
+def leaky_settings() -> str:
+    """A settings file with six fake credentials and a client name."""
     lines = [
         f"GITHUB = '{fakes.github_token()}'",
         f"AWS = '{fakes.aws_key_id()}'",
@@ -57,6 +58,57 @@ def leaky_repo(repo: Path, git: GitRun) -> Path:
         f"CLAUDE = '{fakes.anthropic_key()}'",
         "OWNER = 'Contoso Pharmaceuticals'",
     ]
-    (repo / "settings.py").write_text("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+@pytest.fixture
+def leaky_repo(repo: Path, git: GitRun) -> Path:
+    (repo / "settings.py").write_text(leaky_settings())
+    git("add", ".")
+    return repo
+
+
+#: The private term configured in ``excepted_repo``.
+EXCEPTED_TERM = "Northwind Traders"
+
+
+@pytest.fixture
+def excepted_repo(repo: Path, git: GitRun, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("SECRET_SCAN_PRIVATE_TERMS", EXCEPTED_TERM)
+    config = {
+        "disable": [
+            {"rule": "url-embedded-credentials", "reason": f"{EXCEPTED_TERM} fixtures only"}
+        ],
+        "ignore": [{"path": "vendor/", "reason": "third-party code"}],
+        "allow": [
+            {"rule": "github-token", "path": "docs/**", "reason": "revoked examples"},
+            {"value": fakes.generic_value(), "reason": "unit-test key"},
+            {"rule": "dotenv-file", "path": "examples/.env", "reason": "names only, no values"},
+        ],
+    }
+    files = {
+        ".secret-scan.json": json.dumps(config, indent=2),
+        "docs/a.md": f"token: {fakes.github_token()}\ntoken: {fakes.github_token()}\n",
+        "vendor/a.js": f"t = '{fakes.github_token()}'\n",
+        "vendor/b.js": f"t = '{fakes.slack_token()}'\n",
+        "src/util.py": f'api_key = "{fakes.generic_value()}"\n',
+        "examples/.env": "API_URL=\n",
+        "src/app.py": "\n".join(
+            [
+                f'KEY = "{fakes.aws_key_id()}"  # secret-scan:allow documented format, test only',
+                # Also an assignment the generic rule matches: still one entry.
+                f'access_token = "{fakes.github_token()}"  # secret-scan:allow fixture',
+                # The reason runs over the value it excuses.
+                f'x = "secret-scan:allow quoting {fakes.stripe_live()}"',
+                # The reason names a private term.
+                f"# secret-scan:allow belongs to {EXCEPTED_TERM}",
+                f'SLACK = "{fakes.slack_token()}"',
+            ]
+        )
+        + "\n",
+    }
+    for name, content in files.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(content)
     git("add", ".")
     return repo

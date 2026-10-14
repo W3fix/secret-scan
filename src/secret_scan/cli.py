@@ -12,13 +12,21 @@ import stat
 import subprocess
 import sys
 from collections.abc import Iterable, Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
 from secret_scan import __version__
 from secret_scan.config import CONFIG_FILE, LOCAL_FILE, PRIVATE_ENV, load_settings
 from secret_scan.errors import SecretScanError
-from secret_scan.report import to_sarif, write_github_annotations, write_json, write_text
+from secret_scan.report import (
+    ReportContext,
+    to_sarif,
+    write_github_annotations,
+    write_json,
+    write_markdown,
+    write_text,
+)
 from secret_scan.rules import PathRule
 from secret_scan.scanner import scan
 from secret_scan.sources import (
@@ -26,6 +34,9 @@ from secret_scan.sources import (
     changed_since,
     ensure_local_file_untracked,
     git_root,
+    has_uncommitted_changes,
+    head_commit,
+    resolve_commit,
     staged_files,
     tracked_files,
     walk_paths,
@@ -65,7 +76,12 @@ def _parser() -> argparse.ArgumentParser:
         "--staged", action="store_true", help="scan staged content (for pre-commit hooks)"
     )
     mode.add_argument("--since", metavar="REF", help="scan only files changed since a git ref")
-    p.add_argument("--format", choices=("text", "json"), default="text", help="stdout format")
+    p.add_argument(
+        "--format",
+        choices=("text", "json", "markdown"),
+        default="text",
+        help="stdout format; markdown is an audit report to hand over",
+    )
     p.add_argument("--sarif", type=Path, metavar="FILE", help="also write SARIF 2.1.0 to FILE")
     p.add_argument(
         "--config", type=Path, metavar="FILE", help=f"repo config (default {CONFIG_FILE})"
@@ -105,6 +121,34 @@ def _candidates(args: argparse.Namespace, root: Path, in_git: bool) -> Iterable[
             raise SecretScanError("--staged and --since need a git repository")
         return staged_files(root) if args.staged else changed_since(root, args.since)
     return tracked_files(root) if in_git else walk_paths([Path.cwd()], Path.cwd())
+
+
+def _report_context(args: argparse.Namespace, root: Path, in_git: bool) -> ReportContext:
+    if args.paths:
+        mode = "paths"
+    elif args.staged:
+        mode = "staged"
+    elif args.since:
+        mode = "since"
+    else:
+        mode = "tracked" if in_git else "directory"
+    # SOURCE_DATE_EPOCH (reproducible-builds.org) pins the time, for tests and archives.
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "")
+    now = (
+        datetime.fromtimestamp(int(epoch), timezone.utc)
+        if epoch.isdigit()
+        else datetime.now(timezone.utc)
+    )
+    return ReportContext(
+        mode=mode,
+        root_name=root.name,
+        commit=head_commit(root) if in_git else None,
+        uncommitted=in_git and has_uncommitted_changes(root),
+        since_ref=args.since,
+        since_commit=resolve_commit(root, args.since) if args.since else None,
+        paths=tuple(p.as_posix() for p in args.paths),
+        scanned_at=now,
+    )
 
 
 _HOOK = """\
@@ -183,6 +227,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.sarif.write_text(json.dumps(to_sarif(result, settings), indent=2) + "\n")
         if args.format == "json":
             write_json(result, settings, out)
+        elif args.format == "markdown":
+            write_markdown(result, settings, _report_context(args, root, in_git), out)
         else:
             write_text(
                 result, settings, out, color=_use_color(out, args.no_color), quiet=args.quiet

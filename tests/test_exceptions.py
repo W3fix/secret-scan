@@ -10,49 +10,6 @@ import pytest
 from secret_scan.cli import main
 from secret_scan.config import WITHHELD_REASON
 from tests import fakes
-from tests.conftest import GitRun
-
-TERM = "Northwind Traders"
-
-
-@pytest.fixture
-def excepted_repo(repo: Path, git: GitRun, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("SECRET_SCAN_PRIVATE_TERMS", TERM)
-    config = {
-        "disable": [{"rule": "url-embedded-credentials", "reason": f"{TERM} fixtures only"}],
-        "ignore": [{"path": "vendor/", "reason": "third-party code"}],
-        "allow": [
-            {"rule": "github-token", "path": "docs/**", "reason": "revoked examples"},
-            {"value": fakes.generic_value(), "reason": "unit-test key"},
-            {"rule": "dotenv-file", "path": "examples/.env", "reason": "names only, no values"},
-        ],
-    }
-    files = {
-        ".secret-scan.json": json.dumps(config, indent=2),
-        "docs/a.md": f"token: {fakes.github_token()}\ntoken: {fakes.github_token()}\n",
-        "vendor/a.js": f"t = '{fakes.github_token()}'\n",
-        "vendor/b.js": f"t = '{fakes.slack_token()}'\n",
-        "src/util.py": f'api_key = "{fakes.generic_value()}"\n',
-        "examples/.env": "API_URL=\n",
-        "src/app.py": "\n".join(
-            [
-                f'KEY = "{fakes.aws_key_id()}"  # secret-scan:allow documented format, test only',
-                # Also an assignment the generic rule matches: still one entry.
-                f'access_token = "{fakes.github_token()}"  # secret-scan:allow fixture',
-                # The reason runs over the value it excuses.
-                f'x = "secret-scan:allow quoting {fakes.stripe_live()}"',
-                # The reason names a private term.
-                f"# secret-scan:allow belongs to {TERM}",
-                f'SLACK = "{fakes.slack_token()}"',
-            ]
-        )
-        + "\n",
-    }
-    for name, content in files.items():
-        (repo / name).parent.mkdir(parents=True, exist_ok=True)
-        (repo / name).write_text(content)
-    git("add", ".")
-    return repo
 
 
 def test_register_lists_every_exception(
