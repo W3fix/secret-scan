@@ -67,6 +67,33 @@ def git_root(start: Path) -> Path | None:
     return Path(proc.stdout.decode().strip())
 
 
+def _git_or_none(root: Path, *args: str) -> str | None:
+    """A git command's output, or None if it fails. For facts a report may lack."""
+    try:
+        proc = subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=False)
+    except FileNotFoundError:
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", "replace").strip()
+
+
+def head_commit(root: Path) -> str | None:
+    """The full commit id of ``HEAD``, or None before the first commit."""
+    return _git_or_none(root, "rev-parse", "--verify", "--quiet", "HEAD")
+
+
+def resolve_commit(root: Path, ref: str) -> str | None:
+    if ref.startswith("-"):
+        return None
+    return _git_or_none(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+
+
+def has_uncommitted_changes(root: Path) -> bool:
+    """Whether tracked files differ from ``HEAD``, staged or not."""
+    return bool(_git_or_none(root, "status", "--porcelain", "--untracked-files=no"))
+
+
 def _split_z(out: bytes) -> list[str]:
     return [p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p]
 

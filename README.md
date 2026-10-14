@@ -56,7 +56,7 @@ secret-scan path/ file.txt   # explicit files and directories
 
 | Option | |
 |---|---|
-| `--format text\|json` | stdout format (default `text`) |
+| `--format text\|json\|markdown` | stdout format (default `text`); `markdown` is the [audit report](#audit-report) |
 | `--sarif FILE` | also write SARIF 2.1.0 for GitHub code scanning |
 | `--config FILE` | repository config (default `.secret-scan.json`) |
 | `--private FILE` | private terms (default `.secret-scan.local.json`) |
@@ -113,6 +113,31 @@ and check out with `fetch-depth: 0`. To send findings to code scanning, add
 
 The action runs the code at the SHA you pin, directly from its checkout. It
 doesn't run `pip install` or touch the network.
+
+### Audit report
+
+```bash
+secret-scan --format markdown > secret-scan-report.md
+```
+
+A report to hand to a client or attach to an audit, readable as-is or rendered
+on GitHub. It contains:
+
+- **Scope:** what was scanned (tracked files, staged changes, a `--since` range
+  or explicit paths), the commit, whether uncommitted changes were included, and
+  when.
+- **Tool and rule set:** the version and a fingerprint of the active rules, so two
+  reports can show they used the same checks. Private terms are counted, never
+  listed, and left out of the fingerprint.
+- **Findings by rule,** each with why it matters and what to do about it.
+- **The exceptions register:** every allow, ignore, disable and inline allow in
+  effect, where it's declared, its reason and how much it skipped. Unused entries
+  are marked.
+- **Method and limits:** offline, current files only, values withheld.
+
+Like every other format, it never contains a matched value, and the repository is
+named by its directory, not its path on your machine. Set `SOURCE_DATE_EPOCH` to
+pin the timestamp.
 
 ## Configuration
 
@@ -217,7 +242,7 @@ assignment rule hit the same text, only the specific one is reported.
 ## Permissions
 
 None. secret-scan reads files and runs read-only `git` commands (`ls-files`,
-`diff`, `cat-file`, `rev-parse`). It makes no network calls.
+`diff`, `cat-file`, `rev-parse`, `status`). It makes no network calls.
 `--install-hook` is the only command that writes, and it refuses to replace an
 existing hook without `--force`.
 

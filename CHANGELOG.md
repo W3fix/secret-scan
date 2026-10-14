@@ -14,9 +14,11 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 - Output as text, JSON, and SARIF 2.1.0; GitHub annotations when running in Actions.
 - `--install-hook` for a git pre-commit hook, a pre-commit framework hook, and a composite GitHub Action.
 - Regression gates in CI: golden outputs for every format, a regex timing test for every rule,
-  a 91% branch-coverage floor, tests on macOS and Windows, and a single `CI passed` check.
+  a 93% branch-coverage floor, tests on macOS and Windows, and a single `CI passed` check.
 - `scripts/benchmark.py`: scans pinned public corpora (TruffleHog's canary keys, the CPython standard library,
   Node.js type definitions) and fails on any new or missing finding. Runs in CI.
+- `--format markdown`: an audit report with scope, commit, tool version and rule-set fingerprint,
+  findings by rule with what to do, the exceptions register, and the method's limits.
 - Exceptions register: JSON output lists every allow, ignore, disable and inline allow with its
   source, reason and how often it applied. Reasons containing matched text are withheld.
 - Every built-in rule says what to do about a committed match (`fix` in JSON, `help` in SARIF);
