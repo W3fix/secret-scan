@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import random
 import string
+import zlib
 
 ALNUM = string.ascii_letters + string.digits
 UPPER_ALNUM = string.ascii_uppercase + string.digits
@@ -41,8 +42,23 @@ def entra_secret() -> str:
     return chars(ALNUM, 3, seed=19) + "8" + "Q~" + chars(ALNUM + "_~.-", 34, seed=23)
 
 
-def github_token() -> str:
-    return "gh" + "p_" + chars(ALNUM, 36, seed=29)
+def github_checksum(random_part: str) -> str:
+    """Base62 CRC32 of the random part, as GitHub appends it. Written separately
+    from the scanner's version so a test can't pass by sharing its mistake."""
+    alphabet = string.digits + string.ascii_uppercase + string.ascii_lowercase
+    n, out = zlib.crc32(random_part.encode()), ""
+    for _ in range(6):  # 62**6 > 2**32, so six digits always suffice
+        n, r = divmod(n, 62)
+        out = alphabet[r] + out
+    return out
+
+
+def github_token(*, valid_checksum: bool = True) -> str:
+    random_part = chars(ALNUM, 30, seed=29)
+    checksum = github_checksum(random_part)
+    if not valid_checksum:
+        checksum = checksum[:-1] + ("A" if checksum[-1] != "A" else "B")
+    return "gh" + "p_" + random_part + checksum
 
 
 def github_fine_grained() -> str:

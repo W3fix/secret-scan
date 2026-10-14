@@ -252,7 +252,7 @@ files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
 | Checks whether a credential is live | No (no network calls) | Yes, against the provider's API |
 | Git history, orgs, S3, images | Current files only | Yes |
 | Encoded secrets (base64 and similar) | No | Yes |
-| Detector precision | Shape matching; looser, so more false positives | Structural checks (key pairs, parsed key bodies) |
+| Detector precision | Shape matching plus offline structural checks (key material after a key header, GitHub token checksums); looser, so more false positives | Structural checks (key pairs, parsed key bodies) |
 | Prints the matched value | Never | By default |
 | Personal data, `.env`, Terraform state | Yes | No |
 | Fails the run on a finding | By default | Only with `--fail` |

@@ -8,7 +8,12 @@ from pathlib import Path
 import pytest
 
 from secret_scan.config import load_settings
-from secret_scan.rules import CONTENT_RULES, looks_like_placeholder, shannon_entropy
+from secret_scan.rules import (
+    CONTENT_RULES,
+    github_checksum_ok,
+    looks_like_placeholder,
+    shannon_entropy,
+)
 from secret_scan.scanner import scan_text
 from tests import fakes
 
@@ -74,6 +79,8 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
     ),
     ("github-token", lambda: f"token: {fakes.github_token()}"),
     ("github-token", lambda: fakes.github_fine_grained()),
+    # Longer than the documented layout: no checksum to check, so it still counts.
+    ("github-token", lambda: "gh" + "s_" + fakes.chars(fakes.ALNUM, 40, seed=101)),
     ("gitlab-token", lambda: fakes.gitlab_token()),
     ("slack-token", lambda: fakes.slack_token()),
     ("slack-webhook", lambda: fakes.slack_webhook()),
@@ -135,6 +142,8 @@ def test_every_content_rule_has_a_positive_case() -> None:
         fakes.private_key_header(),
         fakes.private_key_header() + "\nMIIE...\n",  # truncated documentation example
         fakes.private_key_header() + "\nBad Key, though the cert should be OK\n",
+        # GitHub-token shape whose checksum doesn't hold: not issued by GitHub.
+        f"token: {fakes.github_token(valid_checksum=False)}",
     ],
 )
 def test_look_alikes_stay_quiet(text: str, tmp_path: Path) -> None:
@@ -144,6 +153,16 @@ def test_look_alikes_stay_quiet(text: str, tmp_path: Path) -> None:
 def test_specific_rule_wins_over_generic(tmp_path: Path) -> None:
     hits = rules_hit(f'access_token = "{fakes.github_token()}"', tmp_path)
     assert hits == ["github-token"]
+
+
+def test_github_checksum() -> None:
+    assert github_checksum_ok(fakes.github_token())
+    assert not github_checksum_ok(fakes.github_token(valid_checksum=False))
+    # Every random part, including ones whose checksum has leading zeros.
+    for seed in range(200):
+        random_part = fakes.chars(fakes.ALNUM, 30, seed=seed)
+        assert github_checksum_ok("gh" + "o_" + random_part + fakes.github_checksum(random_part))
+    assert github_checksum_ok(fakes.github_fine_grained())  # layout undocumented: unchecked
 
 
 def test_entropy() -> None:

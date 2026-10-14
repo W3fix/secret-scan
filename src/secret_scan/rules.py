@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import math
 import re
+import string
+import zlib
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -32,6 +35,8 @@ class Rule:
     min_entropy: float = 0.0
     #: When set, the line containing the match must also match this.
     line_requires: re.Pattern[str] | None = None
+    #: When set, the secret span must pass this structural check, such as a checksum.
+    well_formed: Callable[[str], bool] | None = None
     #: ``builtin``, ``config`` (repository config) or ``private`` (personal terms).
     origin: str = "builtin"
 
@@ -88,6 +93,7 @@ def _rule(
     check_placeholder: bool = True,
     min_entropy: float = 0.0,
     line_requires: re.Pattern[str] | None = None,
+    well_formed: Callable[[str], bool] | None = None,
 ) -> Rule:
     return Rule(
         rule_id,
@@ -97,7 +103,33 @@ def _rule(
         check_placeholder=check_placeholder,
         min_entropy=min_entropy,
         line_requires=line_requires,
+        well_formed=well_formed,
     )
+
+
+_BASE62 = string.digits + string.ascii_uppercase + string.ascii_lowercase
+
+
+def _base62(n: int, width: int) -> str:
+    out = ""
+    while n:
+        n, r = divmod(n, 62)
+        out = _BASE62[r] + out
+    return out.rjust(width, _BASE62[0])
+
+
+def github_checksum_ok(token: str) -> bool:
+    """Whether a classic-format GitHub token's built-in checksum holds.
+
+    These tokens are a prefix, 30 random characters and a 6-character base62
+    CRC32 of the random part. A random string of the same shape fails it, so
+    test data and minified code stop matching. Layouts GitHub doesn't document
+    (longer tokens, ``github_pat_``) pass unchecked rather than risk a miss.
+    """
+    prefix, _, body = token.partition("_")
+    if prefix not in {"ghp", "gho", "ghu", "ghs", "ghr"} or len(body) != 36:
+        return True
+    return _base62(zlib.crc32(body[:30].encode()), 6) == body[30:]
 
 
 # Hosts reserved for documentation (RFC 2606): example.com/.net/.org and the
@@ -177,6 +209,7 @@ CONTENT_RULES: tuple[Rule, ...] = (
         "A GitHub token can read or write repositories and act as its owner.",
         r"(?<![A-Za-z0-9_])(?P<secret>(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,251}"
         r"|github_pat_[A-Za-z0-9_]{60,251})(?![A-Za-z0-9_])",
+        well_formed=github_checksum_ok,
     ),
     _rule(
         "gitlab-token",
