@@ -108,6 +108,33 @@ def write_github_annotations(result: ScanResult, settings: Settings, out: TextIO
         out.write(f"::error {','.join(props)}::{_gh_escape_data(message)}\n")
 
 
+def exceptions_register(result: ScanResult, settings: Settings) -> list[dict[str, Any]]:
+    """Every exception in effect, with its reason and how often it applied.
+
+    ``applied`` counts skipped matches for allow entries and skipped files for
+    ignore entries. Disable entries have no count: what a disabled rule would
+    have matched is unknown. Each inline entry is one skipped match.
+    """
+    entries: list[dict[str, Any]] = []
+    for e in settings.exemptions:
+        entry: dict[str, Any] = {"kind": e.kind, "source": e.source}
+        if e.rule:
+            entry["rule"] = e.rule
+        if e.path:
+            entry["path"] = e.path
+        if e.pins_value:
+            entry["value"] = "withheld"
+        entry["reason"] = e.reason
+        if e.kind != "disable":
+            entry["applied"] = result.applied[e.source]
+        entries.append(entry)
+    for a in sorted(result.inline_allows, key=lambda a: (a.path, a.line, a.rule)):
+        entries.append(
+            {"kind": "inline", "source": f"{a.path}:{a.line}", "rule": a.rule, "reason": a.reason}
+        )
+    return entries
+
+
 def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
     return {
         "version": 1,
@@ -125,6 +152,7 @@ def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
             }
             for f in result.findings
         ],
+        "exceptions": exceptions_register(result, settings),
         "summary": {
             "findings": len(result.findings),
             "filesScanned": result.files_scanned,

@@ -24,7 +24,7 @@ import json
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -41,12 +41,18 @@ _RULE_ID = re.compile(r"[a-z0-9][a-z0-9-]{1,63}\Z")
 _MIN_TERM_LENGTH = 3
 
 
+#: Shown in place of a reason that contains text a rule matches.
+WITHHELD_REASON = "(reason withheld: it contains text a rule matches)"
+
+
 @dataclass(frozen=True)
 class AllowEntry:
     reason: str
     rule: str | None = None
     path: re.Pattern[str] | None = None
     value: str | None = None
+    #: Where it was declared, such as ``.secret-scan.json: allow[0]``.
+    source: str = ""
 
     def matches(self, rule_id: str, path: str, value: str | None) -> bool:
         if self.rule is not None and self.rule != rule_id:
@@ -56,12 +62,32 @@ class AllowEntry:
         return self.value is None or self.value == value
 
 
+@dataclass(frozen=True)
+class Exemption:
+    """A configured exception, as listed in the exceptions register.
+
+    An allow entry that pins an exact value says so; the value itself is never
+    kept here, so no report can print it.
+    """
+
+    kind: str  # "allow", "ignore" or "disable"
+    source: str
+    reason: str
+    rule: str | None = None
+    #: The path glob as written in the config.
+    path: str | None = None
+    pins_value: bool = False
+
+
 @dataclass
 class Settings:
     content_rules: list[Rule]
     path_rules: list[PathRule]
     allow: list[AllowEntry] = field(default_factory=list)
-    ignore: list[re.Pattern[str]] = field(default_factory=list)
+    #: Compiled path glob and the source that declared it.
+    ignore: list[tuple[re.Pattern[str], str]] = field(default_factory=list)
+    #: Every configured exception, in declaration order, for the register.
+    exemptions: list[Exemption] = field(default_factory=list)
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES
     #: Where private terms came from, for display. Never the terms themselves.
     private_sources: list[str] = field(default_factory=list)
@@ -82,8 +108,22 @@ class Settings:
                 return r.fix
         return ""
 
+    def ignored_by(self, path: str) -> str | None:
+        """The source of the first ignore entry that covers ``path``."""
+        return next((source for g, source in self.ignore if g.match(path)), None)
+
     def is_ignored(self, path: str) -> bool:
-        return any(g.match(path) for g in self.ignore)
+        return self.ignored_by(path) is not None
+
+    def safe_reason(self, reason: str) -> str:
+        """``reason``, unless a content rule matches inside it.
+
+        Reasons are free text that reports repeat. One that quotes a secret or
+        a private term would turn the report into the leak.
+        """
+        if any(r.pattern.search(reason) for r in self.content_rules):
+            return WITHHELD_REASON
+        return reason
 
 
 def user_private_file() -> Path:
@@ -284,10 +324,11 @@ def _apply_repo_config(path: Path, settings: Settings, known: set[str]) -> None:
         obj = _obj(where, item)
         _check_keys(where, obj, {"rule", "reason"})
         rule_id = _req(where, obj, "rule")
-        _req(where, obj, "reason")
+        reason = _req(where, obj, "reason")
         if rule_id not in known:
             raise SecretScanError(f"{where}: unknown rule '{rule_id}' (see --list-rules)")
         disabled.add(rule_id)
+        settings.exemptions.append(Exemption("disable", where, reason, rule=rule_id))
     settings.content_rules = [r for r in settings.content_rules if r.id not in disabled]
     settings.path_rules = [r for r in settings.path_rules if r.id not in disabled]
 
@@ -296,8 +337,9 @@ def _apply_repo_config(path: Path, settings: Settings, known: set[str]) -> None:
         obj = _obj(where, item)
         _check_keys(where, obj, {"path", "reason"})
         pattern = _req(where, obj, "path")
-        _req(where, obj, "reason")
-        settings.ignore.append(_glob(where, pattern))
+        reason = _req(where, obj, "reason")
+        settings.ignore.append((_glob(where, pattern), where))
+        settings.exemptions.append(Exemption("ignore", where, reason, path=pattern))
 
     for i, item in enumerate(_list(name, data, "allow")):
         where = f"{name}: allow[{i}]"
@@ -328,8 +370,24 @@ def _apply_repo_config(path: Path, settings: Settings, known: set[str]) -> None:
                 rule=allow_rule,
                 path=_glob(where, path_glob) if path_glob else None,
                 value=value,
+                source=where,
             )
         )
+        settings.exemptions.append(
+            Exemption(
+                "allow",
+                where,
+                reason,
+                rule=allow_rule,
+                path=path_glob,
+                pins_value=value is not None,
+            )
+        )
+
+    # Last, once every rule that could match inside a reason is known.
+    settings.exemptions = [
+        replace(e, reason=settings.safe_reason(e.reason)) for e in settings.exemptions
+    ]
 
     max_bytes = data.get("maxFileBytes", DEFAULT_MAX_FILE_BYTES)
     if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0:

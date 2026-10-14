@@ -187,6 +187,15 @@ The marker goes on the same line, or alone on the line above for formats without
 trailing comments. A marker without a reason doesn't suppress anything. The
 finding is still reported, with a note asking for one.
 
+### Exceptions register
+
+JSON output lists every exception in effect under `exceptions`: each allow,
+ignore and disable entry with where it's declared, its reason and how many
+matches (or, for `ignore`, files) it skipped, and each inline allow that skipped
+a match. An allow entry that pins a value shows `"value": "withheld"`. A reason
+that contains text a rule matches, such as a quoted token or a private term, is
+replaced with a note rather than repeated.
+
 ## Rules
 
 `secret-scan --list-rules` shows the active set with each rule's reason.
