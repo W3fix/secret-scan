@@ -17,6 +17,8 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
   a 91% branch-coverage floor, tests on macOS and Windows, and a single `CI passed` check.
 - `scripts/benchmark.py`: scans pinned public corpora (TruffleHog's canary keys, the CPython standard library,
   Node.js type definitions) and fails on any new or missing finding. Runs in CI.
+- Exceptions register: JSON output lists every allow, ignore, disable and inline allow with its
+  source, reason and how often it applied. Reasons containing matched text are withheld.
 - Every built-in rule says what to do about a committed match (`fix` in JSON, `help` in SARIF);
   custom rules can add one.
 - Rules can carry a structural check. `github-token` uses GitHub's built-in checksum, so

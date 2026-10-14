@@ -60,6 +60,7 @@
       "length": 106
     }
   ],
+  "exceptions": [],
   "summary": {
     "findings": 6,
     "filesScanned": 1,
