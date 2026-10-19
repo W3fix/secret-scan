@@ -30,7 +30,13 @@ from typing import IO, TypeAlias, cast
 from secret_scan.config import LOCAL_FILE, Settings
 from secret_scan.errors import SecretScanError
 from secret_scan.scanner import Finding, ScanResult, scan_path_rules, scan_text
-from secret_scan.sources import git_output, head_commit, is_partial_clone, is_shallow
+from secret_scan.sources import (
+    git_output,
+    head_commit,
+    is_partial_clone,
+    resolve_commit,
+    shallow_boundary,
+)
 
 #: Bytes inspected for a NUL to decide content is binary, as for current files.
 _BINARY_SNIFF = 8000
@@ -87,13 +93,22 @@ class HistoryResult(ScanResult):
     """
 
     head: str = ""
+    #: With ``--since``: the commit the range starts after.
+    since: str = ""
     commits: int = 0
-    #: In a shallow clone, the oldest commit fetched appears to add everything it has.
+    #: The scan reached a shallow clone's oldest commit, which appears to add
+    #: everything it has because its parents weren't fetched.
     shallow: bool = False
 
 
-def revisions(head: str) -> tuple[str, ...]:
-    """Every branch, tag and remote-tracking branch, and ``HEAD`` when it's detached."""
+def revisions(head: str, since: str = "") -> tuple[str, ...]:
+    """Every branch, tag and remote-tracking branch, and ``HEAD`` when it's detached.
+
+    With ``since`` (a commit id), only the commits ``HEAD`` has and it doesn't:
+    a pull request's, for instance.
+    """
+    if since:
+        return (f"^{since}", head, "--")
     return ("--branches", "--tags", "--remotes", head, "--")
 
 
@@ -212,7 +227,9 @@ def _lines(stream: IO[bytes], cap: int) -> Iterator[bytes]:
         yield line
 
 
-def _parse(stream: IO[bytes], max_bytes: int, result: HistoryResult) -> Iterator[_Change]:
+def _parse(
+    stream: IO[bytes], max_bytes: int, result: HistoryResult, boundary: frozenset[str]
+) -> Iterator[_Change]:
     """Changes in ``git log -p`` output, each with the lines it added."""
     change: _Change | None = None
     hunk: _Hunk | None = None
@@ -228,6 +245,7 @@ def _parse(stream: IO[bytes], max_bytes: int, result: HistoryResult) -> Iterator
             sha, _, stamp = raw[1:].partition(b" ")
             commit, time = sha.decode(), int(stamp)
             result.commits += 1
+            result.shallow = result.shallow or commit in boundary
             continue
         if raw.startswith(b"diff --"):
             if change is not None:
@@ -265,18 +283,19 @@ def _parse(stream: IO[bytes], max_bytes: int, result: HistoryResult) -> Iterator
         yield change
 
 
-def _log(root: Path, head: str, max_bytes: int, result: HistoryResult) -> Iterator[_Change]:
+def _log(root: Path, max_bytes: int, result: HistoryResult) -> Iterator[_Change]:
+    revs = revisions(result.head, result.since)
     # stderr goes to a file: a pipe nobody reads while stdout streams could fill and deadlock.
     with tempfile.TemporaryFile() as errors:
         proc = subprocess.Popen(
-            ["git", "-C", str(root), *_LOG_CONFIG, "log", *_LOG_OPTIONS, *revisions(head)],
+            ["git", "-C", str(root), *_LOG_CONFIG, "log", *_LOG_OPTIONS, *revs],
             stdout=subprocess.PIPE,
             stderr=errors,
             env=_env(),
         )
         stdout = cast(IO[bytes], proc.stdout)
         try:
-            yield from _parse(stdout, max_bytes, result)
+            yield from _parse(stdout, max_bytes, result, shallow_boundary(root))
         finally:
             stdout.close()
             code = proc.wait()
@@ -443,11 +462,27 @@ def _date(time: int) -> str:
     return datetime.fromtimestamp(time, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def scan_history(root: Path, settings: Settings) -> HistoryResult:
-    """Every secret any commit added, once each, with whether ``HEAD`` still has it."""
+def _since_commit(root: Path, ref: str) -> str:
+    if ref.startswith("-"):
+        raise SecretScanError("--since needs a git ref, not an option")
+    commit = resolve_commit(root, ref)
+    if commit is None:
+        raise SecretScanError(
+            f"--since {ref}: no such commit here. In CI, check out with fetch-depth: 0 "
+            "so the base commit is present"
+        )
+    return commit
+
+
+def scan_history(root: Path, settings: Settings, since: str | None = None) -> HistoryResult:
+    """Every secret any commit added, once each, with whether ``HEAD`` still has it.
+
+    With ``since``, only the commits after that ref: what a branch would bring in.
+    """
     head = head_commit(root)
     if head is None:
         raise SecretScanError("--history needs a commit to start from, and there are none yet")
+    start = _since_commit(root, since) if since is not None else ""
     if is_partial_clone(root):
         raise SecretScanError(
             "this is a partial clone (cloned with --filter), so reading its history would "
@@ -456,7 +491,12 @@ def scan_history(root: Path, settings: Settings) -> HistoryResult:
         )
     # Commits that added the file, newest first: name the first.
     added = git_output(
-        root, "log", "--format=%H", "--diff-filter=A", *revisions(head), f":(glob)**/{LOCAL_FILE}"
+        root,
+        "log",
+        "--format=%H",
+        "--diff-filter=A",
+        *revisions(head, start),
+        f":(glob)**/{LOCAL_FILE}",
     ).split()
     if added:
         raise SecretScanError(
@@ -464,11 +504,11 @@ def scan_history(root: Path, settings: Settings) -> HistoryResult:
             "so they're in this repository's history. Remove it from history, and treat the "
             "terms as exposed if it was ever pushed"
         )
-    result = HistoryResult(head=head, shallow=is_shallow(root))
+    result = HistoryResult(head=head, since=start)
     keys = _Keys(settings)
     first: dict[_Key, HistoryFinding] = {}
     with _Blobs(root) as blobs:
-        for change in _log(root, head, settings.max_file_bytes, result):
+        for change in _log(root, settings.max_file_bytes, result):
             for key, f in _scan_change(change, settings, result, keys, blobs):
                 if key not in first:
                     first[key] = HistoryFinding(

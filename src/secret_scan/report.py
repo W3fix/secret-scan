@@ -121,6 +121,8 @@ def _write_history_summary(result: HistoryResult, s: _Style, out: TextIO, *, qui
         return
     passed, failed = _marks(out)
     scanned = _plural(result.commits, "commit") + " scanned"
+    if result.since:
+        scanned += f", since {result.since[:12]}"
     if result.findings:
         in_head = sum(1 for f in result.findings if isinstance(f, HistoryFinding) and f.in_head)
         found = _plural(len(result.findings), "finding")
@@ -189,8 +191,14 @@ def _history_fields(f: Finding) -> dict[str, Any]:
 def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
     history: dict[str, Any] = {}
     if isinstance(result, HistoryResult):
+        since = {"since": result.since} if result.since else {}
         history = {
-            "history": {"head": result.head, "commits": result.commits, "shallow": result.shallow}
+            "history": {
+                "head": result.head,
+                **since,
+                "commits": result.commits,
+                "shallow": result.shallow,
+            }
         }
     return {
         "version": 1,
@@ -489,8 +497,12 @@ def write_markdown(
     w("## Scan\n\n")
     if history:
         commits = _count(history.commits, "commit", "commits")
-        w("- **Scope:** every commit on every branch, tag and remote-tracking branch")
-        w(f" ({commits})\n")
+        if history.since:
+            ref = _code(context.since_ref or history.since)
+            w(f"- **Scope:** the {commits} since {ref} ({_code(history.since)})\n")
+        else:
+            w("- **Scope:** every commit on every branch, tag and remote-tracking branch")
+            w(f" ({commits})\n")
         uncommitted = ", not including uncommitted changes" if context.uncommitted else ""
         w(f"- **Commit:** {_code(history.head)} (HEAD){uncommitted}\n")
         if history.shallow:

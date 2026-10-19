@@ -77,10 +77,11 @@ def _parser() -> argparse.ArgumentParser:
         "--staged", action="store_true", help="scan staged content (for pre-commit hooks)"
     )
     mode.add_argument("--since", metavar="REF", help="scan only files changed since a git ref")
-    mode.add_argument(
+    p.add_argument(
         "--history",
         action="store_true",
-        help="scan every commit on every branch and tag; report where each secret entered",
+        help="scan every commit on every branch and tag (with --since, only the commits "
+        "after REF); report where each secret entered",
     )
     p.add_argument(
         "--format",
@@ -164,6 +165,8 @@ def _check_history_options(args: argparse.Namespace, in_git: bool) -> None:
         raise SecretScanError("--history needs a git repository")
     if args.paths:
         raise SecretScanError("PATH arguments can't be combined with --history")
+    if args.staged:
+        raise SecretScanError("--history can't be combined with --staged")
     if args.sarif:
         raise SecretScanError(
             "--sarif can't be combined with --history: a finding in history may not be in the "
@@ -244,7 +247,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result: ScanResult
         if args.history:
             _check_history_options(args, in_git)
-            result = scan_history(root, settings)
+            result = scan_history(root, settings, args.since)
         else:
             result = scan(_candidates(args, root, in_git), settings)
 

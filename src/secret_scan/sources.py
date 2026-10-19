@@ -95,9 +95,15 @@ def has_uncommitted_changes(root: Path) -> bool:
     return bool(_git_or_none(root, "status", "--porcelain", "--untracked-files=no"))
 
 
-def is_shallow(root: Path) -> bool:
-    """Whether commits before some point weren't fetched (``clone --depth``)."""
-    return _git_or_none(root, "rev-parse", "--is-shallow-repository") == "true"
+def shallow_boundary(root: Path) -> frozenset[str]:
+    """Commits whose parents weren't fetched (``clone --depth``), if any."""
+    name = _git_or_none(root, "rev-parse", "--git-path", "shallow")
+    if not name:
+        return frozenset()
+    try:
+        return frozenset((root / name).read_text(encoding="ascii").split())
+    except OSError:
+        return frozenset()  # not shallow: git writes the file only when it is
 
 
 def is_partial_clone(root: Path) -> bool:

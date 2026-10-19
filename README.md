@@ -52,6 +52,7 @@ secret-scan                  # every file tracked by git (or the current directo
 secret-scan --staged         # staged content only: what the next commit will contain
 secret-scan --since main     # files changed since a ref
 secret-scan --history        # every commit on every branch and tag: what was ever committed
+secret-scan --history --since main   # only the commits this branch adds
 secret-scan path/ file.txt   # explicit files and directories
 ```
 
@@ -112,6 +113,19 @@ and check out with `fetch-depth: 0`. To send findings to code scanning, add
 `sarif: secret-scan.sarif` and upload it with `github/codeql-action/upload-sarif`
 (that job needs `security-events: write`).
 
+`since` compares the files at the base with the files now, so a secret that one
+commit in the pull request adds and a later one removes isn't in either. It is in
+the history the merge brings in, though. A second step catches it:
+
+```yaml
+      - uses: W3fix/secret-scan@<full commit SHA> # v0.1.0
+        with:
+          since: ${{ github.event.pull_request.base.sha }}
+          history: true
+```
+
+That step needs `fetch-depth: 0` too, and doesn't produce annotations or SARIF.
+
 The action runs the code at the SHA you pin, directly from its checkout. It
 doesn't run `pip install` or touch the network.
 
@@ -149,7 +163,8 @@ secret-scan --history
 
 Scans every commit on every branch, tag and remote-tracking branch, offline, and
 reports each secret once: the commit that added it, when, where, and whether
-`HEAD` still has it.
+`HEAD` still has it. With `--since REF`, it scans only the commits after `REF`:
+what a branch would bring in when it merges.
 
 ```text
 $ secret-scan --history
@@ -164,9 +179,9 @@ config/settings.py:4:17  aws-access-key-id  (20 chars)
 Deleting a committed secret doesn't revoke it: every clone still has it. That's
 why history output says what to do about each finding. JSON adds `commit`, `date`
 (the committer date, in UTC) and `inHead` to each finding, plus a `history` object
-with the `HEAD` commit, the number of commits scanned and whether the clone is
-shallow. In history mode, file counts in the summary count changes: one file in
-one commit.
+with the `HEAD` commit, the `since` commit if given, the number of commits scanned,
+and `shallow`. In history mode, file counts in the summary count changes: one file
+in one commit.
 
 How it decides:
 
@@ -189,8 +204,10 @@ How it decides:
   file that `.gitattributes` marks as binary is read from the repository and
   checked like any other file.
 - **Offline.** A partial clone (`git clone --filter`) is refused, because reading
-  its history would download objects. A shallow clone is scanned, and the output
-  says so: its oldest commit appears to add every file it has.
+  its history would download objects. A shallow clone is scanned, and if the scan
+  reaches its oldest commit, which appears to add every file it has because its
+  parents weren't fetched, the output says so (`shallow` in JSON). A `--since` range
+  that ends before that commit is complete.
 
 Authors and commit messages aren't read or reported. The commit id leads to both,
 and names and email addresses are personal data the output doesn't need. History
@@ -368,9 +385,9 @@ files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
 
 On TruffleHog's public canary repository (`trufflesecurity/test_keys`), secret-scan
 finds everything in the current files: the private key, the AWS key pair, and a
-URL with `admin:admin` credentials. CI checks this on every change. With `--history`
-it also finds the AWS key pair that the repository's first commit added and a later
-one removed.
+URL with `admin:admin` credentials. With `--history` it also finds the AWS key pair
+that the repository's first commit added and a later one removed. CI checks both on
+every change.
 
 If you need breadth or verification, use TruffleHog or gitleaks.
 secret-scan is the commit gate: it never echoes what it finds, treats personal

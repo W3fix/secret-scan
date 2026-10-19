@@ -65,6 +65,39 @@ jobs:
           print("ok:", rules)
           PY
 
+  action-reads-history:
+    name: Action finds a secret a later commit removed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A branch that adds a fake secret and removes it again: its end state is
+      # clean, but the secret is in the history it would merge.
+      - name: Commit a fake secret, then remove it
+        id: branch
+        run: |
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git config user.name ci && git config user.email ci@example.com
+          PYTHONPATH=. python3 -c "from tests import fakes; print('token = ' + repr(fakes.github_token()))" > planted.py
+          git add planted.py && git commit -qm plant
+          git rm -q planted.py && git commit -qm remove
+      - name: The changed files alone show nothing
+        uses: ./
+        with:
+          since: ${{ steps.branch.outputs.base }}
+      - id: history
+        uses: ./
+        continue-on-error: true
+        with:
+          since: ${{ steps.branch.outputs.base }}
+          history: "true"
+      - name: Require the history scan to fail
+        env:
+          OUTCOME: ${{ steps.history.outcome }}
+        run: |
+          test "$OUTCOME" = failure || { echo "::error::the history scan missed a removed secret"; exit 1; }
+
   benchmark:
     name: Benchmark corpora match their expected findings
     runs-on: ubuntu-latest
@@ -130,7 +163,7 @@ jobs:
   ci-passed:
     name: CI passed
     if: always()
-    needs: [self-scan, action-catches-a-leak, benchmark, test, test-os]
+    needs: [self-scan, action-catches-a-leak, action-reads-history, benchmark, test, test-os]
     runs-on: ubuntu-latest
     steps:
       - env:
