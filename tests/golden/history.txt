@@ -1,0 +1,34 @@
+.env  dotenv-file  (file name)
+    Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Stop tracking it (git rm --cached), add it to .gitignore, rotate every secret it held, and commit a .env.example with placeholders instead.
+settings.py:1:11  github-token  (40 chars)
+    A GitHub token can read or write repositories and act as its owner.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Revoke the token (the owner's developer settings, or the organization's token settings), review the audit log for its use, and replace it with a GitHub App or the workflow's GITHUB_TOKEN where possible.
+settings.py:2:8  aws-access-key-id  (20 chars)
+    An AWS access key ID is half of a usable credential and names the account it belongs to.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Deactivate, then delete, the access key in IAM and check CloudTrail for its use. Prefer short-lived credentials: IAM roles, or OIDC federation from CI.
+settings.py:3:37  azure-storage-account-key  (88 chars)
+    A storage account shared key grants full control of the account and can't be scoped.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Regenerate the key on the storage account (the two keys can be rotated one at a time without downtime) and update its consumers. Prefer Microsoft Entra ID authorization, and disable shared key access where nothing needs it.
+settings.py:4:10  azure-entra-client-secret  (40 chars)
+    An Entra ID client secret lets anyone authenticate as the application.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Delete the secret from the app registration, check the service principal's sign-in logs, and move to a managed identity or workload identity federation where possible.
+settings.py:5:38  connection-string-password  (15 chars)
+    A password inside a connection string is a live database credential.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Change the password on the database, then load the connection string from configuration (a Key Vault reference, an environment variable) or use managed identity authentication.
+settings.py:6:11  anthropic-api-key  (106 chars)
+    An Anthropic API key is billed to its organization and can read its workspace data.
+    Committed in <commit-1> on 2026-03-01; no longer in HEAD, but still in history.
+    What to do: Delete the key in the Anthropic console, check the workspace's usage for activity you don't expect, and issue a replacement held in a secret store.
+deploy.sh:1:15  slack-token  (42 chars)
+    A Slack token grants workspace access as a bot or user.
+    Committed in <commit-3> on 2026-03-01; still in HEAD.
+    What to do: Revoke it (Slack's auth.revoke method, or the app's OAuth settings) and keep the replacement in a secret store.
+
+✗ 8 findings in history (3 commits scanned), 1 still in HEAD. Values withheld.

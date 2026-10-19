@@ -20,6 +20,9 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
+#: How far past a key's header to look for its footer.
+_MAX_EXTENT = 64 * 1024
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -41,6 +44,9 @@ class Rule:
     line_requires: re.Pattern[str] | None = None
     #: When set, the secret span must pass this structural check, such as a checksum.
     well_formed: Callable[[str], bool] | None = None
+    #: Where the secret ends, when the span is only its start (a key's header).
+    #: History compares secrets by their whole text, header to footer.
+    ends_with: re.Pattern[str] | None = None
     #: ``builtin``, ``config`` (repository config) or ``private`` (personal terms).
     origin: str = "builtin"
 
@@ -48,6 +54,12 @@ class Rule:
         if "secret" in match.re.groupindex and match.group("secret") is not None:
             return match.span("secret")
         return match.span()
+
+    def secret_end(self, text: str, end: int) -> int:
+        """Where the secret that ``secret_span`` starts ends: its footer, if it has one."""
+        if self.ends_with and (m := self.ends_with.search(text, end, end + _MAX_EXTENT)):
+            return m.end()
+        return end
 
 
 @dataclass(frozen=True)
@@ -100,6 +112,7 @@ def _rule(
     min_entropy: float = 0.0,
     line_requires: re.Pattern[str] | None = None,
     well_formed: Callable[[str], bool] | None = None,
+    ends_with: str | None = None,
 ) -> Rule:
     return Rule(
         rule_id,
@@ -111,6 +124,7 @@ def _rule(
         min_entropy=min_entropy,
         line_requires=line_requires,
         well_formed=well_formed,
+        ends_with=re.compile(ends_with) if ends_with else None,
     )
 
 
@@ -165,6 +179,8 @@ CONTENT_RULES: tuple[Rule, ...] = (
         # one way; letting a header end at any space backtracks exponentially.
         r"(?=(?:\s|\\[rn])+(?:[A-Za-z-]+:[^\n\\]*(?:\n|\\n)(?:\s|\\[rn])*)*[A-Za-z0-9+/]{40})",
         check_placeholder=False,
+        # Every key of a type has the same header; the body is what differs.
+        ends_with=r"-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----",
     ),
     _rule(
         "aws-access-key-id",

@@ -18,7 +18,9 @@ import pytest
 
 from secret_scan import __version__
 from secret_scan.cli import main
+from tests import fakes
 from tests.conftest import GitRun, leaky_settings
+from tests.test_history import commit
 
 GOLDEN = Path(__file__).parent / "golden"
 
@@ -94,3 +96,38 @@ def test_markdown_report(
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")  # 2026-01-01 00:00 UTC
     assert main(["--format", "markdown"]) == 1
     _check("report.md", capsys.readouterr().out, commit=git("rev-parse", "HEAD").strip())
+
+
+@pytest.fixture
+def history_repo(repo: Path, git: GitRun, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """A secret removed, one still there, a dotenv file, and one inline allow."""
+    monkeypatch.setenv("GIT_AUTHOR_DATE", "2026-03-01T09:00:00Z")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-03-01T09:00:00Z")
+    return [
+        commit(git, {"settings.py": leaky_settings(), ".env": "DEBUG=1\n"}),
+        commit(git, {"settings.py": "# moved to the vault\n"}, remove=(".env",)),
+        commit(
+            git,
+            {
+                "deploy.sh": f"export SLACK='{fakes.slack_token()}'\n",
+                "test_api.py": f"KEY = '{fakes.stripe_live()}'  # secret-scan:allow test mode\n",
+            },
+        ),
+    ]
+
+
+def _commits(text: str, commits: list[str]) -> str:
+    # Commit ids depend on line endings and git's object format; number them.
+    for n, sha in enumerate(commits, 1):
+        text = text.replace(sha, f"<commit-{n}>").replace(sha[:12], f"<commit-{n}>")
+    return text
+
+
+def test_history_text(history_repo: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--history"]) == 1
+    _check("history.txt", _commits(capsys.readouterr().out, history_repo))
+
+
+def test_history_json(history_repo: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--history", "--format", "json"]) == 1
+    _check("history.json", _commits(capsys.readouterr().out, history_repo))
