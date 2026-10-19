@@ -132,6 +132,8 @@ def _candidates(args: argparse.Namespace, root: Path, in_git: bool) -> Iterable[
 def _report_context(args: argparse.Namespace, root: Path, in_git: bool) -> ReportContext:
     if args.paths:
         mode = "paths"
+    elif args.history:
+        mode = "history"
     elif args.staged:
         mode = "staged"
     elif args.since:
@@ -167,8 +169,6 @@ def _check_history_options(args: argparse.Namespace, in_git: bool) -> None:
             "--sarif can't be combined with --history: a finding in history may not be in the "
             "current files, where code scanning places its alerts"
         )
-    if args.format == "markdown":
-        raise SecretScanError("--history supports --format text and json")
 
 
 _HOOK = """\

@@ -131,3 +131,13 @@ def test_history_text(history_repo: list[str], capsys: pytest.CaptureFixture[str
 def test_history_json(history_repo: list[str], capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--history", "--format", "json"]) == 1
     _check("history.json", _commits(capsys.readouterr().out, history_repo))
+
+
+def test_history_report(
+    history_repo: list[str],
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")  # 2026-01-01 00:00 UTC
+    assert main(["--history", "--format", "markdown"]) == 1
+    _check("history-report.md", _commits(capsys.readouterr().out, history_repo))

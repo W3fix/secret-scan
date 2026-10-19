@@ -383,17 +383,33 @@ def _rules_line(settings: Settings) -> str:
 
 
 def _coverage_line(result: ScanResult, settings: Settings) -> str:
-    parts = [f"{_count(result.files_scanned, 'file', 'files')} scanned"]
+    # In history, the unit is a change: one file in one commit.
+    one, many = ("change", "changes") if isinstance(result, HistoryResult) else ("file", "files")
+    parts = [f"{_count(result.files_scanned, one, many)} scanned"]
     if result.skipped_binary:
-        parts.append(
-            f"{_count(result.skipped_binary, 'binary file', 'binary files')} checked by name only"
-        )
+        binary = _count(result.skipped_binary, f"binary {one}", f"binary {many}")
+        parts.append(f"{binary} checked by name only")
     if result.skipped_large:
-        large = _count(len(result.skipped_large), "file", "files")
+        large = _count(len(result.skipped_large), one, many)
         parts.append(f"{large} over {settings.max_file_bytes:,} bytes checked by name only")
     if result.ignored:
-        parts.append(f"{_count(result.ignored, 'file', 'files')} excluded by `ignore` entries")
+        parts.append(f"{_count(result.ignored, one, many)} excluded by `ignore` entries")
     return "; ".join(parts)
+
+
+def _declared_in(e: dict[str, Any]) -> str:
+    where = _code(e["source"])
+    return f"{where} in {_code(e['commit'][:12])}" if "commit" in e else where
+
+
+def _in_commit(entry: str) -> str:
+    """``<commit>:<path>`` as the path and a short commit id."""
+    commit, _, path = entry.partition(":")
+    return f"{_code(path)} in {_code(commit[:12])}"
+
+
+def _yes_no(flag: bool) -> str:
+    return "yes" if flag else "no"
 
 
 def _applies_to(e: dict[str, Any]) -> str:
@@ -431,13 +447,24 @@ _METHOD = """\
   match, never the matched text, so it can be shared without spreading what it describes.
 - **Offline.** The scan made no network calls, so no credential was tested. Treat every
   finding as live until it has been rotated.
-- **Current files, not history.** A secret removed from the files can still be in git
-  history and in every clone. Rotating it is the fix; rewriting history doesn't
-  replace that.
+{scope}
 - **Patterns, not proof.** Rules match credentials in their usual forms. Encoded or
   deliberately split values aren't detected, and a finding can be test data: the
   exceptions register shows what was excused, and why.
 """
+
+_CURRENT_FILES = """\
+- **Current files, not history.** A secret removed from the files can still be in git
+  history and in every clone. Rotating it is the fix; rewriting history doesn't
+  replace that."""
+
+_HISTORY = """\
+- **Every commit, each secret once.** Each commit was scanned for the lines it added (a
+  change is one file in one commit), and each secret is listed at the commit that first
+  added it. Still in HEAD means a rule matches the same value in the files of the commit
+  named above. A secret that isn't is still in history and in every clone, so rotating it
+  is the fix either way; rewriting history doesn't replace that. Exceptions are the
+  current configuration's, and inline markers count where they were present."""
 
 
 def write_markdown(
@@ -445,21 +472,37 @@ def write_markdown(
 ) -> None:
     """An audit report to hand to a client: scope, findings with fixes, exceptions."""
     w = out.write
+    history = result if isinstance(result, HistoryResult) else None
+    in_head = [isinstance(f, HistoryFinding) and f.in_head for f in result.findings]
     files = len({f.path for f in result.findings})
     w(f"# Secret scan report: {_code(context.root_name)}\n\n")
-    if result.findings:
-        found = _count(len(result.findings), "finding", "findings")
+    found = _count(len(result.findings), "finding", "findings")
+    if history and result.findings:
+        w(f"**{found} in history, {sum(in_head)} still in HEAD.**")
+    elif result.findings:
         w(f"**{found} in {_count(files, 'file', 'files')}.**")
     else:
-        w("**No findings.**")
+        w("**No findings in history.**" if history else "**No findings.**")
     w(" Values are withheld: this report shows where each finding is and which rule\n")
     w("it matched, never the matched text.\n\n")
 
     w("## Scan\n\n")
-    w(f"- **Scope:** {_scope(context)}\n")
-    commit = _commit(context)
-    if commit is not None:
-        w(f"- **Commit:** {commit}\n")
+    if history:
+        commits = _count(history.commits, "commit", "commits")
+        w("- **Scope:** every commit on every branch, tag and remote-tracking branch")
+        w(f" ({commits})\n")
+        uncommitted = ", not including uncommitted changes" if context.uncommitted else ""
+        w(f"- **Commit:** {_code(history.head)} (HEAD){uncommitted}\n")
+        if history.shallow:
+            w(
+                "- **History:** a shallow clone. Commits before the oldest one fetched aren't "
+                "included, and that commit appears to add every file it has\n"
+            )
+    else:
+        w(f"- **Scope:** {_scope(context)}\n")
+        commit = _commit(context)
+        if commit is not None:
+            w(f"- **Commit:** {commit}\n")
     w(f"- **Scanned:** {context.scanned_at.astimezone(timezone.utc):%Y-%m-%d %H:%M} UTC\n")
     w(f"- **Tool:** secret-scan {__version__}, rule set {_code(rule_set_fingerprint(settings))}\n")
     w(f"- **Rules:** {_rules_line(settings)}\n")
@@ -469,11 +512,18 @@ def write_markdown(
         by_rule: dict[str, list[Finding]] = {}
         for f in result.findings:
             by_rule.setdefault(f.rule, []).append(f)
-        order = sorted(by_rule, key=lambda r: (-len(by_rule[r]), r))
-        w("## Findings by rule\n\n| Rule | Findings | Files |\n|---|---:|---:|\n")
+        # In history, what's still in HEAD comes first: it needs removing as well as rotating.
+        still = {
+            r: sum(1 for f in fs if isinstance(f, HistoryFinding) and f.in_head)
+            for r, fs in by_rule.items()
+        }
+        order = sorted(by_rule, key=lambda r: (-still[r], -len(by_rule[r]), r))
+        last = "Still in HEAD" if history else "Files"
+        w(f"## Findings by rule\n\n| Rule | Findings | {last} |\n|---|---:|---:|\n")
         for rule in order:
             fs = by_rule[rule]
-            w(f"| {_cell(_code(rule))} | {len(fs)} | {len({f.path for f in fs})} |\n")
+            count = still[rule] if history else len({f.path for f in fs})
+            w(f"| {_cell(_code(rule))} | {len(fs)} | {count} |\n")
         w("\n## Findings\n")
         for rule in order:
             fs = by_rule[rule]
@@ -483,10 +533,17 @@ def write_markdown(
             if fix:
                 w(f"**What to do.** {_prose(fix)}\n\n")
             notes = any(f.note for f in fs)
-            w("| Location | Match |" + (" Note |" if notes else "") + "\n")
-            w("|---|---|" + ("---|" if notes else "") + "\n")
+            if history:
+                w("| Added at | Commit | Date | Still in HEAD | Match |")
+                w((" Note |" if notes else "") + "\n|---|---|---|---|---|")
+            else:
+                w("| Location | Match |" + (" Note |" if notes else "") + "\n|---|---|")
+            w(("---|" if notes else "") + "\n")
             for f in fs:
-                row = f"| {_cell(_code(_location(f)))} | {_measure(f)} |"
+                row = f"| {_cell(_code(_location(f)))} |"
+                if isinstance(f, HistoryFinding):
+                    row += f" {_code(f.commit[:12])} | {f.date[:10]} | {_yes_no(f.in_head)} |"
+                row += f" {_measure(f)} |"
                 if notes:
                     row += f" {_cell(_prose(f.note))} |"
                 w(row + "\n")
@@ -501,7 +558,7 @@ def write_markdown(
         w("\n| Kind | Declared in | Applies to | Reason | Skipped |\n|---|---|---|---|---:|\n")
         for e in register:
             w(
-                f"| {e['kind']} | {_cell(_code(e['source']))} | {_cell(_applies_to(e))} "
+                f"| {e['kind']} | {_cell(_declared_in(e))} | {_cell(_applies_to(e))} "
                 f"| {_cell(_prose(e['reason']))} | {_skipped(e)} |\n"
             )
         w("\n")
@@ -511,11 +568,11 @@ def write_markdown(
     if result.skipped_large:
         w("## Checked by name only\n\n")
         w(f"Larger than {settings.max_file_bytes:,} bytes, so content rules didn't run:\n\n")
-        for path in result.skipped_large[:50]:
-            w(f"- {_code(path)}\n")
+        for entry in result.skipped_large[:50]:
+            w(f"- {_in_commit(entry) if history else _code(entry)}\n")
         if len(result.skipped_large) > 50:
             w(f"- and {len(result.skipped_large) - 50} more\n")
         w("\n")
 
-    w(_METHOD)
+    w(_METHOD.format(scope=_HISTORY if history else _CURRENT_FILES))
     w(f"\n---\n\nGenerated by [secret-scan]({TOOL_URL}) {__version__}.\n")
