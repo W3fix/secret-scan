@@ -92,11 +92,21 @@ jobs:
         with:
           since: ${{ steps.branch.outputs.base }}
           history: "true"
-      - name: Require the history scan to fail
+      - name: Require the history scan to fail, for the removed secret
         env:
           OUTCOME: ${{ steps.history.outcome }}
+          BASE: ${{ steps.branch.outputs.base }}
+          PYTHONPATH: src
         run: |
           test "$OUTCOME" = failure || { echo "::error::the history scan missed a removed secret"; exit 1; }
+          # A failure could also be an error (exit 2); check it's the finding.
+          python3 -m secret_scan --no-user-config --history --since "$BASE" --format json > history.json || true
+          python3 - <<'PY'
+          import json
+          found = [(f["path"], f["rule"], f["inHead"]) for f in json.load(open("history.json"))["findings"]]
+          assert found == [("planted.py", "github-token", False)], found
+          print("ok:", found)
+          PY
 
   benchmark:
     name: Benchmark corpora match their expected findings
