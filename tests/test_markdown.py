@@ -11,6 +11,7 @@ import pytest
 
 from secret_scan.cli import main
 from secret_scan.config import PRIVATE_ENV, Settings, load_settings
+from secret_scan.history import HistoryFinding, HistoryResult
 from secret_scan.report import ReportContext, rule_set_fingerprint, write_markdown
 from secret_scan.scanner import Finding, ScanResult
 from tests.conftest import GitRun
@@ -146,3 +147,49 @@ def test_cli_outside_git(
     report = capsys.readouterr().out
     assert line(report, "Scope") == "every file in the directory (not a git repository)"
     assert line(report, "Commit") is None
+
+
+def test_history_scope_and_shallow_clone(tmp_path: Path) -> None:
+    result = HistoryResult(head=COMMIT, commits=1, shallow=True)
+    report = render(settings_for(tmp_path), ReportContext("history", "r", uncommitted=True), result)
+    assert report.startswith("# Secret scan report: `r`\n\n**No findings in history.**")
+    assert line(report, "Scope") == (
+        "every commit on every branch, tag and remote-tracking branch (1 commit)"
+    )
+    assert line(report, "Commit") == f"`{COMMIT}` (HEAD), not including uncommitted changes"
+    assert (line(report, "History") or "").startswith("a shallow clone.")
+    assert "**Every commit, each secret once.**" in report
+    assert "**Current files, not history.**" not in report
+
+
+def test_history_rows_and_counts(tmp_path: Path) -> None:
+    def found(rule: str, in_head: bool) -> HistoryFinding:
+        return HistoryFinding(
+            "a.py", 1, 1, rule, 40, commit="1" * 40, date="2026-03-01T09:00:00Z", in_head=in_head
+        )
+
+    result = HistoryResult(
+        head=COMMIT,
+        commits=4,
+        files_scanned=3,
+        skipped_binary=2,
+        ignored=1,
+        skipped_large=[f"{'2' * 40}:big file.txt"],
+        findings=[
+            found("aws-access-key-id", False),
+            found("aws-access-key-id", False),
+            found("github-token", True),
+        ],
+    )
+    report = render(settings_for(tmp_path), ReportContext("history", "r"), result)
+    assert "**3 findings in history, 1 still in HEAD.**" in report
+    assert line(report, "Coverage") == (
+        "3 changes scanned; 2 binary changes checked by name only; "
+        "1 change over 2,097,152 bytes checked by name only; 1 change excluded by `ignore` entries"
+    )
+    # Still in HEAD first, though it has fewer findings.
+    assert report.index("| `github-token` | 1 | 1 |") < report.index(
+        "| `aws-access-key-id` | 2 | 0 |"
+    )
+    assert f"| `a.py:1:1` | `{'1' * 12}` | 2026-03-01 | yes | 40 chars |" in report
+    assert f"- `big file.txt` in `{'2' * 12}`" in report

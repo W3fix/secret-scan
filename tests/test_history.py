@@ -462,7 +462,6 @@ def test_json_output(repo: Path, git: GitRun, capsys: pytest.CaptureFixture[str]
     [
         (["--history", "src"], "PATH arguments"),
         (["--history", "--sarif", "out.sarif"], "--sarif can't be combined"),
-        (["--history", "--format", "markdown"], "supports --format text and json"),
         (["--history", "--staged"], "not allowed with argument"),
     ],
 )
@@ -490,7 +489,7 @@ def test_outside_a_repository(
     assert "--history needs a git repository" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("fmt", ["text", "json"])
+@pytest.mark.parametrize("fmt", ["text", "json", "markdown"])
 def test_history_never_prints_a_matched_value(
     repo: Path,
     git: GitRun,

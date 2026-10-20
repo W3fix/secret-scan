@@ -134,7 +134,8 @@ on GitHub. It contains:
 - **The exceptions register:** every allow, ignore, disable and inline allow in
   effect, where it's declared, its reason and how much it skipped. Unused entries
   are marked.
-- **Method and limits:** offline, current files only, values withheld.
+- **Method and limits:** offline, values withheld, and what the scan covered:
+  current files, or with `--history`, every commit.
 
 Like every other format, it never contains a matched value, and the repository is
 named by its directory, not its path on your machine. Set `SOURCE_DATE_EPOCH` to
@@ -193,8 +194,12 @@ How it decides:
 
 Authors and commit messages aren't read or reported. The commit id leads to both,
 and names and email addresses are personal data the output doesn't need. History
-mode doesn't produce SARIF, GitHub annotations or the markdown report yet: the
-first two mark lines in the current files, and a secret in history may not be in them.
+mode doesn't produce SARIF or GitHub annotations: both mark lines in the current
+files, and a secret in history may not be in them.
+
+`secret-scan --history --format markdown` writes the [audit report](#audit-report)
+for history: each finding with the commit that added it, its date and whether `HEAD`
+still has it, with what's still in `HEAD` listed first.
 
 ## Configuration
 

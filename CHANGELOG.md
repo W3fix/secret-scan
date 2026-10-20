@@ -26,6 +26,7 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 - `--history`: scans every commit on every branch, tag and remote-tracking branch, offline,
   and reports each secret once, with the commit that added it, its date, path and line,
   and whether `HEAD` still has it. Content a merge adds itself is scanned, and
-  `.gitattributes` can't hide a text file from it. Text and JSON output.
+  `.gitattributes` can't hide a text file from it. Text, JSON and markdown output; the
+  report lists what's still in `HEAD` first.
 - Rules can carry a structural check. `github-token` uses GitHub's built-in checksum, so
   token-shaped strings GitHub never issued (test data, minified code) no longer match.
