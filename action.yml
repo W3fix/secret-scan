@@ -12,6 +12,14 @@ inputs:
       base SHA). Leave empty to scan every tracked file.
     required: false
     default: ""
+  history:
+    description: >-
+      "true" to scan git history instead of the files: every commit, or with
+      since, only the commits after it. Catches a secret one commit adds and a
+      later one removes, which the files alone no longer show. Check out with
+      fetch-depth: 0. Can't be combined with sarif.
+    required: false
+    default: "false"
   config:
     description: Path to the repository config. Defaults to .secret-scan.json at the root.
     required: false
@@ -42,11 +50,13 @@ runs:
         PYTHONPATH: ${{ github.action_path }}/src
         SECRET_SCAN_PRIVATE_TERMS: ${{ inputs.private-terms }}
         INPUT_SINCE: ${{ inputs.since }}
+        INPUT_HISTORY: ${{ inputs.history }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_SARIF: ${{ inputs.sarif }}
       run: |
         args=(--no-user-config)
         if [ -n "$INPUT_SINCE" ]; then args+=(--since "$INPUT_SINCE"); fi
+        if [ "$INPUT_HISTORY" = "true" ]; then args+=(--history); fi
         if [ -n "$INPUT_CONFIG" ]; then args+=(--config "$INPUT_CONFIG"); fi
         if [ -n "$INPUT_SARIF" ]; then args+=(--sarif "$INPUT_SARIF"); fi
         python3 -m secret_scan "${args[@]}"

@@ -1,0 +1,7 @@
+# trufflehog-canary-history @ 0416560b1330d8ac42045813251d85c688717eaf. Written by scripts/benchmark.py --update.
+0416560b1330 new_key:2 aws-access-key-id in HEAD
+0416560b1330 new_key:3 aws-secret-access-key in HEAD
+77b2a3e56973 keys:3 url-embedded-credentials in HEAD
+77b2a3e56973 keys:6 private-key in HEAD
+fbc14303ffbf keys:4 aws-access-key-id
+fbc14303ffbf keys:5 aws-secret-access-key

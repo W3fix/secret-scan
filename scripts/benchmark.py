@@ -3,9 +3,12 @@
 
 Each corpus in ``benchmarks/corpora.json`` is a public repository at a fixed
 commit, and ``benchmarks/<name>.expected`` lists every finding it should
-produce as ``path:line rule``. Any difference fails: a new finding is usually a
-false positive, and a missing one means a rule got narrower. Fix the rule, or
-run with ``--update`` and let the reviewer see the change in the diff.
+produce as ``path:line rule``. A corpus with ``"history": true`` is scanned with
+``--history`` from that commit back, and lists ``commit path:line rule``, marked
+``in HEAD`` where the pinned commit still has it. Any difference fails: a new
+finding is usually a false positive, and a missing one means a rule got
+narrower. Fix the rule, or run with ``--update`` and let the reviewer see the
+change in the diff.
 
 Only locations and rule ids are compared or printed, never matched values.
 
@@ -37,7 +40,8 @@ def git(cwd: Path, *args: str) -> str:
 
 
 def fetch(corpus: dict[str, object], dest: Path) -> None:
-    """Shallow, sparse checkout of exactly the pinned commit."""
+    """Shallow, sparse checkout of exactly the pinned commit, or for a history
+    corpus, that commit and everything before it."""
     commit = str(corpus["commit"])
     if (dest / ".git").is_dir() and git(dest, "rev-parse", "HEAD") == commit:
         return
@@ -45,10 +49,14 @@ def fetch(corpus: dict[str, object], dest: Path) -> None:
     dest.mkdir(parents=True)
     git(dest, "init", "-q")
     git(dest, "remote", "add", "origin", str(corpus["repo"]))
-    paths = [str(p) for p in corpus["paths"]]  # type: ignore[attr-defined]
-    if paths != ["."]:
-        git(dest, "sparse-checkout", "set", "--no-cone", *(f"/{p}/" for p in paths))
-    git(dest, "fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", commit)
+    if corpus.get("history"):
+        # All of it: history mode refuses partial clones and flags shallow ones.
+        git(dest, "fetch", "-q", "origin", commit)
+    else:
+        paths = [str(p) for p in corpus["paths"]]  # type: ignore[attr-defined]
+        if paths != ["."]:
+            git(dest, "sparse-checkout", "set", "--no-cone", *(f"/{p}/" for p in paths))
+        git(dest, "fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", commit)
     git(dest, "-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD")
 
 
@@ -61,9 +69,10 @@ def scan(corpus: dict[str, object], dest: Path) -> Counter[str]:
         if k not in {"SECRET_SCAN_PRIVATE_TERMS", "GITHUB_ACTIONS"}
     }
     env["PYTHONPATH"] = str(ROOT / "src")
+    history = bool(corpus.get("history"))
+    where = ["--history"] if history else [str(p) for p in corpus["paths"]]  # type: ignore[attr-defined]
     proc = subprocess.run(
-        [sys.executable, "-m", "secret_scan", "--format", "json", "--no-user-config"]
-        + [str(p) for p in corpus["paths"]],  # type: ignore[attr-defined]
+        [sys.executable, "-m", "secret_scan", "--format", "json", "--no-user-config", *where],
         cwd=dest,
         env=env,
         capture_output=True,
@@ -73,6 +82,12 @@ def scan(corpus: dict[str, object], dest: Path) -> Counter[str]:
     if proc.returncode not in (0, 1):
         sys.exit(f"{corpus['name']}: scan failed (exit {proc.returncode}): {proc.stderr.strip()}")
     findings = json.loads(proc.stdout)["findings"]
+    if history:
+        return Counter(
+            f"{f['commit'][:12]} {f['path']}:{f['line']} {f['rule']}"
+            + (" in HEAD" if f["inHead"] else "")
+            for f in findings
+        )
     return Counter(f"{f['path']}:{f['line']} {f['rule']}" for f in findings)
 
 

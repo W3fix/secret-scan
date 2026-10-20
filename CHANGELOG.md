@@ -28,5 +28,9 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
   and whether `HEAD` still has it. Content a merge adds itself is scanned, and
   `.gitattributes` can't hide a text file from it. Text, JSON and markdown output; the
   report lists what's still in `HEAD` first.
+- `--history --since REF` scans only the commits after `REF`, and the Action's `history`
+  input runs it: a pull request that adds a secret and removes it in a later commit
+  leaves its files clean but its history not. CI checks both, and the benchmark now
+  includes the canary repository's history.
 - Rules can carry a structural check. `github-token` uses GitHub's built-in checksum, so
   token-shaped strings GitHub never issued (test data, minified code) no longer match.

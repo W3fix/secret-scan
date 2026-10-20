@@ -7,6 +7,13 @@
     "paths": ["."]
   },
   {
+    "name": "trufflehog-canary-history",
+    "why": "The same repository's history: the AWS key pair its first commit added and a later one removed must be found too.",
+    "repo": "https://github.com/trufflesecurity/test_keys",
+    "commit": "0416560b1330d8ac42045813251d85c688717eaf",
+    "history": true
+  },
+  {
     "name": "cpython-lib",
     "why": "Python 3.13.16 standard library: ordinary code, plus real test keys under Lib/test/certdata.",
     "repo": "https://github.com/python/cpython",

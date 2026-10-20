@@ -365,6 +365,44 @@ def test_repository_config_cant_change_what_is_read(repo: Path, git: GitRun) -> 
     assert found(history(repo)) == baseline
 
 
+# --- a range: what a pull request brings in -----------------------------------
+
+
+@pytest.fixture
+def pull_request(repo: Path, git: GitRun) -> tuple[str, str]:
+    """main has a secret of its own; the branch adds one and removes it again."""
+    commit(git, {"old.py": f"K = '{fakes.aws_key_id()}'\n"})
+    base = git("rev-parse", "HEAD").strip()
+    git("switch", "-q", "-c", "feature")
+    added = commit(git, {"app.py": f"T = '{TOKEN}'\n"})
+    commit(git, {"app.py": "T = None\n"})
+    return base, added
+
+
+def test_since_scans_only_what_the_branch_adds(
+    repo: Path, pull_request: tuple[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    base, added = pull_request
+    result = scan_history(repo, load_settings(repo, use_user_file=False), "main")
+    assert found(result) == [("app.py", 1, "github-token", added, False)]
+    assert (result.since, result.commits) == (base, 2)
+    # The end state is clean, so a scan of what changed sees nothing.
+    assert main(["--since", "main"]) == 0
+    assert main(["--history", "--since", "main"]) == 1
+    out = capsys.readouterr().out
+    assert f"(2 commits scanned, since {base[:12]}), 0 still in HEAD." in out
+
+
+def test_since_in_json_and_the_report(
+    repo: Path, pull_request: tuple[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    base, _ = pull_request
+    assert main(["--history", "--since", "main", "--format", "json"]) == 1
+    assert json.loads(capsys.readouterr().out)["history"]["since"] == base
+    assert main(["--history", "--since", "main", "--format", "markdown"]) == 1
+    assert f"- **Scope:** the 2 commits since `main` (`{base}`)\n" in capsys.readouterr().out
+
+
 # --- refusals and warnings -----------------------------------------------------
 
 
@@ -402,7 +440,11 @@ def test_git_failing_partway_is_an_error(repo: Path, git: GitRun) -> None:
 
 
 def test_a_shallow_clone_says_so(
-    repo: Path, git: GitRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    repo: Path,
+    git: GitRun,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     commit(git, {"a.py": f"T = '{TOKEN}'\n"})
     commit(git, {"a.py": "T = None\n", "b.txt": "b\n"})
@@ -416,6 +458,12 @@ def test_a_shallow_clone_says_so(
     assert result.shallow and result.commits == 1 and found(result) == []
     monkeypatch.chdir(clone)
     assert main(["--history"]) == 0
+    assert "Shallow clone" in capsys.readouterr().out
+    # A range that stops short of the oldest commit fetched is complete.
+    fetched = git("-C", str(clone), "rev-parse", "HEAD").strip()
+    git("-C", str(clone), "commit", "-q", "--allow-empty", "-m", "on top")
+    result = scan_history(clone, load_settings(clone, use_user_file=False), fetched)
+    assert not result.shallow and result.commits == 1
 
 
 # --- the command line ----------------------------------------------------------
@@ -462,7 +510,9 @@ def test_json_output(repo: Path, git: GitRun, capsys: pytest.CaptureFixture[str]
     [
         (["--history", "src"], "PATH arguments"),
         (["--history", "--sarif", "out.sarif"], "--sarif can't be combined"),
-        (["--history", "--staged"], "not allowed with argument"),
+        (["--history", "--staged"], "can't be combined with --staged"),
+        (["--history", "--since=--output=x"], "needs a git ref, not an option"),
+        (["--history", "--since", "no-such-ref"], "no such commit here"),
     ],
 )
 def test_options_history_refuses(
@@ -473,11 +523,7 @@ def test_options_history_refuses(
     message: str,
 ) -> None:
     commit(git, {"a.py": "x = 1\n"})
-    try:
-        code = main(argv)
-    except SystemExit as e:  # argparse rejects mutually exclusive options itself
-        code = int(e.code or 0)
-    assert code == 2
+    assert main(argv) == 2
     assert message in capsys.readouterr().err
 
 
