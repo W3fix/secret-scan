@@ -19,6 +19,7 @@ from typing import TextIO
 from secret_scan import __version__
 from secret_scan.config import CONFIG_FILE, LOCAL_FILE, PRIVATE_ENV, load_settings
 from secret_scan.errors import SecretScanError
+from secret_scan.history import scan_history
 from secret_scan.report import (
     ReportContext,
     to_sarif,
@@ -28,7 +29,7 @@ from secret_scan.report import (
     write_text,
 )
 from secret_scan.rules import PathRule
-from secret_scan.scanner import scan
+from secret_scan.scanner import ScanResult, scan
 from secret_scan.sources import (
     Candidate,
     changed_since,
@@ -76,6 +77,11 @@ def _parser() -> argparse.ArgumentParser:
         "--staged", action="store_true", help="scan staged content (for pre-commit hooks)"
     )
     mode.add_argument("--since", metavar="REF", help="scan only files changed since a git ref")
+    mode.add_argument(
+        "--history",
+        action="store_true",
+        help="scan every commit on every branch and tag; report where each secret entered",
+    )
     p.add_argument(
         "--format",
         choices=("text", "json", "markdown"),
@@ -151,6 +157,20 @@ def _report_context(args: argparse.Namespace, root: Path, in_git: bool) -> Repor
     )
 
 
+def _check_history_options(args: argparse.Namespace, in_git: bool) -> None:
+    if not in_git:
+        raise SecretScanError("--history needs a git repository")
+    if args.paths:
+        raise SecretScanError("PATH arguments can't be combined with --history")
+    if args.sarif:
+        raise SecretScanError(
+            "--sarif can't be combined with --history: a finding in history may not be in the "
+            "current files, where code scanning places its alerts"
+        )
+    if args.format == "markdown":
+        raise SecretScanError("--history supports --format text and json")
+
+
 _HOOK = """\
 #!/bin/sh
 # Installed by secret-scan {version}: scans staged content before each commit.
@@ -221,7 +241,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if in_git:
             ensure_local_file_untracked(root)
 
-        result = scan(_candidates(args, root, in_git), settings)
+        result: ScanResult
+        if args.history:
+            _check_history_options(args, in_git)
+            result = scan_history(root, settings)
+        else:
+            result = scan(_candidates(args, root, in_git), settings)
 
         if args.sarif:
             args.sarif.write_text(json.dumps(to_sarif(result, settings), indent=2) + "\n")
@@ -233,7 +258,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             write_text(
                 result, settings, out, color=_use_color(out, args.no_color), quiet=args.quiet
             )
-            if os.environ.get("GITHUB_ACTIONS") == "true":
+            # Annotations mark lines in the current files; history findings may not be there.
+            if os.environ.get("GITHUB_ACTIONS") == "true" and not args.history:
                 write_github_annotations(result, settings, out)
         return EXIT_FINDINGS if result.findings else EXIT_CLEAN
     except SecretScanError as e:

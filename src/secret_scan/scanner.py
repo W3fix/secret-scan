@@ -10,7 +10,7 @@ from __future__ import annotations
 import bisect
 import re
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
@@ -51,6 +51,8 @@ class InlineAllow:
     line: int
     rule: str
     reason: str
+    #: In history, the commit whose version of the line had the marker.
+    commit: str = ""
 
 
 @dataclass
@@ -67,21 +69,26 @@ class ScanResult:
 
 
 class _Lines:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, first_line: int = 1) -> None:
         self.text = text
+        #: The number of the text's first line: more than 1 when it's an excerpt.
+        self.first = first_line
         self.starts = [0] + [m.end() for m in re.finditer("\n", text)]
 
     def locate(self, offset: int) -> tuple[int, int]:
-        """1-based line and column for a character offset."""
+        """Line and column (from 1) for a character offset."""
         idx = bisect.bisect_right(self.starts, offset) - 1
-        return idx + 1, offset - self.starts[idx] + 1
+        return idx + self.first, offset - self.starts[idx] + 1
+
+    def start(self, number: int) -> int:
+        return self.starts[number - self.first]
 
     def line(self, number: int) -> str:
-        if number < 1 or number > len(self.starts):
+        idx = number - self.first
+        if idx < 0 or idx >= len(self.starts):
             return ""
-        start = self.starts[number - 1]
-        end = self.starts[number] if number < len(self.starts) else len(self.text)
-        return self.text[start:end]
+        end = self.starts[idx + 1] if idx + 1 < len(self.starts) else len(self.text)
+        return self.text[self.starts[idx] : end]
 
 
 @dataclass(frozen=True)
@@ -106,17 +113,30 @@ def _inline_allow(lines: _Lines, line_no: int) -> _Marker | None:
         # silence the next line.
         if m is None or not re.fullmatch(r"\s*(?:#|//|--|;|/\*|<!--|\*)?\s*", above[: m.start()]):
             return None
-    offset = lines.starts[number - 1]
+    offset = lines.start(number)
     if not m.group("reason"):
         return _Marker("", offset + m.end(), offset + m.end())
     return _Marker(m.group("reason").strip(), offset + m.start("reason"), offset + m.end("reason"))
 
 
 def scan_text(
-    path: str, text: str, settings: Settings, record: ScanResult | None = None
+    path: str,
+    text: str,
+    settings: Settings,
+    record: ScanResult | None = None,
+    *,
+    first_line: int = 1,
+    in_scope: Callable[[int, int], bool] | None = None,
+    exceptions: bool = True,
 ) -> list[Finding]:
-    """Findings in ``text``. Exceptions that skip a match are noted in ``record``."""
-    lines = _Lines(text)
+    """Findings in ``text``. Exceptions that skip a match are noted in ``record``.
+
+    History scanning passes an excerpt of a file: ``first_line`` numbers its
+    first line, and ``in_scope(first, last)`` keeps only matches on the lines a
+    commit added. ``exceptions=False`` reports what allow entries and inline
+    markers would skip, to tell whether a value is still present at all.
+    """
+    lines = _Lines(text, first_line)
     # (start, end, generic, finding)
     hits: list[tuple[int, int, bool, Finding]] = []
     # (start, end, generic, allow entry source or inline allow)
@@ -126,6 +146,10 @@ def scan_text(
             start, end = rule.secret_span(m)
             if end <= start:
                 continue
+            if in_scope:
+                last = rule.secret_end(text, end) - 1
+                if not in_scope(lines.locate(start)[0], lines.locate(last)[0]):
+                    continue
             value = text[start:end]
             if rule.check_placeholder and looks_like_placeholder(value):
                 continue
@@ -136,14 +160,15 @@ def scan_text(
             line_no, col = lines.locate(start)
             if rule.line_requires and not rule.line_requires.search(lines.line(line_no)):
                 continue
-            allowed_by = next(
-                (a.source for a in settings.allow if a.matches(rule.id, path, value)), None
-            )
-            if allowed_by is not None:
-                skipped.append((start, end, rule.generic, allowed_by))
-                continue
+            if exceptions:
+                allowed_by = next(
+                    (a.source for a in settings.allow if a.matches(rule.id, path, value)), None
+                )
+                if allowed_by is not None:
+                    skipped.append((start, end, rule.generic, allowed_by))
+                    continue
             note = ""
-            marker = _inline_allow(lines, line_no)
+            marker = _inline_allow(lines, line_no) if exceptions else None
             if marker is not None and marker.reason:
                 # A reason that runs over the match would repeat the value.
                 overlaps = marker.start < end and start < marker.end

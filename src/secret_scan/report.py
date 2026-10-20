@@ -11,6 +11,7 @@ from typing import Any, TextIO
 
 from secret_scan import __version__
 from secret_scan.config import Settings
+from secret_scan.history import HistoryFinding, HistoryResult
 from secret_scan.rules import CONTENT_RULES, PATH_RULES, Rule
 from secret_scan.scanner import Finding, ScanResult
 
@@ -66,6 +67,11 @@ class _Style:
         return self._wrap("2", t)
 
 
+def _committed(f: HistoryFinding) -> str:
+    where = "still in HEAD" if f.in_head else "no longer in HEAD, but still in history"
+    return f"Committed in {f.commit[:12]} on {f.date[:10]}; {where}."
+
+
 def write_text(
     result: ScanResult, settings: Settings, out: TextIO, *, color: bool, quiet: bool
 ) -> None:
@@ -73,10 +79,18 @@ def write_text(
     for f in result.findings:
         out.write(f"{s.bold(_location(f))}  {s.red(f.rule)}  ({_measure(f)})\n")
         out.write(f"    {s.dim(settings.rule_why(f.rule))}\n")
+        if isinstance(f, HistoryFinding):
+            # Committed means it has left the machine, so what to do applies now.
+            out.write(f"    {_committed(f)}\n")
+            if fix := settings.rule_fix(f.rule):
+                out.write(f"    {s.dim('What to do: ' + fix)}\n")
         if f.note:
             out.write(f"    {s.yellow(f.note)}\n")
     for path in result.skipped_large:
         out.write(s.yellow(f"skipped (larger than {settings.max_file_bytes} bytes): {path}") + "\n")
+    if isinstance(result, HistoryResult):
+        _write_history_summary(result, s, out, quiet=quiet)
+        return
     if quiet and not result.findings:
         return
     passed, failed = _marks(out)
@@ -92,6 +106,31 @@ def write_text(
         )
     else:
         out.write(s.green(f"{passed} No findings") + f" ({scanned}).\n")
+
+
+def _write_history_summary(result: HistoryResult, s: _Style, out: TextIO, *, quiet: bool) -> None:
+    if result.shallow:
+        out.write(
+            s.yellow(
+                "Shallow clone: older commits weren't fetched, and the oldest one here appears "
+                "to add every file it has. Run git fetch --unshallow to scan the full history."
+            )
+            + "\n"
+        )
+    if quiet and not result.findings:
+        return
+    passed, failed = _marks(out)
+    scanned = _plural(result.commits, "commit") + " scanned"
+    if result.findings:
+        in_head = sum(1 for f in result.findings if isinstance(f, HistoryFinding) and f.in_head)
+        found = _plural(len(result.findings), "finding")
+        out.write(
+            "\n"
+            + s.red(f"{failed} {found} in history")
+            + f" ({scanned}), {in_head} still in HEAD. Values withheld.\n"
+        )
+    else:
+        out.write(s.green(f"{passed} No findings in history") + f" ({scanned}).\n")
 
 
 def _gh_escape_data(text: str) -> str:
@@ -134,16 +173,29 @@ def exceptions_register(result: ScanResult, settings: Settings) -> list[dict[str
             entry["applied"] = result.applied[e.source]
         entries.append(entry)
     for a in sorted(result.inline_allows, key=lambda a: (a.path, a.line, a.rule)):
-        entries.append(
-            {"kind": "inline", "source": f"{a.path}:{a.line}", "rule": a.rule, "reason": a.reason}
-        )
+        entry = {"kind": "inline", "source": f"{a.path}:{a.line}", "rule": a.rule}
+        if a.commit:
+            entry["commit"] = a.commit
+        entries.append({**entry, "reason": a.reason})
     return entries
 
 
+def _history_fields(f: Finding) -> dict[str, Any]:
+    if not isinstance(f, HistoryFinding):
+        return {}
+    return {"commit": f.commit, "date": f.date, "inHead": f.in_head}
+
+
 def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
+    history: dict[str, Any] = {}
+    if isinstance(result, HistoryResult):
+        history = {
+            "history": {"head": result.head, "commits": result.commits, "shallow": result.shallow}
+        }
     return {
         "version": 1,
         "tool": {"name": "secret-scan", "version": __version__},
+        **history,
         "findings": [
             {
                 "path": f.path,
@@ -153,6 +205,7 @@ def to_json(result: ScanResult, settings: Settings) -> dict[str, Any]:
                 "why": settings.rule_why(f.rule),
                 **({"fix": fix} if (fix := settings.rule_fix(f.rule)) else {}),
                 "length": f.length,
+                **_history_fields(f),
                 **({"note": f.note} if f.note else {}),
             }
             for f in result.findings

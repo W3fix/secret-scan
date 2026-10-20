@@ -42,7 +42,8 @@ class Candidate:
     read: Callable[[], bytes]
 
 
-def _git(root: Path, *args: str) -> bytes:
+def git_output(root: Path, *args: str) -> bytes:
+    """A git command's output. A failure is an error that quotes git's last line."""
     try:
         proc = subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=False)
     except FileNotFoundError:
@@ -94,6 +95,23 @@ def has_uncommitted_changes(root: Path) -> bool:
     return bool(_git_or_none(root, "status", "--porcelain", "--untracked-files=no"))
 
 
+def is_shallow(root: Path) -> bool:
+    """Whether commits before some point weren't fetched (``clone --depth``)."""
+    return _git_or_none(root, "rev-parse", "--is-shallow-repository") == "true"
+
+
+def is_partial_clone(root: Path) -> bool:
+    """Whether git downloads missing objects from a remote on demand (``clone --filter``)."""
+    out = _git_or_none(
+        root, "config", "--get-regexp", r"^(extensions\.partialclone|remote\..*\.promisor)$"
+    )
+    for line in (out or "").splitlines():
+        key, _, value = line.partition(" ")
+        if key == "extensions.partialclone" or value.lower() in {"true", "yes", "on", "1"}:
+            return True
+    return False
+
+
 def _split_z(out: bytes) -> list[str]:
     return [p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p]
 
@@ -105,7 +123,7 @@ def ensure_local_file_untracked(root: Path) -> None:
     repository. If it's tracked, that has already failed. Say so loudly
     rather than scan around it.
     """
-    tracked = _split_z(_git(root, "ls-files", "-z", "--", f":(glob)**/{LOCAL_FILE}"))
+    tracked = _split_z(git_output(root, "ls-files", "-z", "--", f":(glob)**/{LOCAL_FILE}"))
     if tracked:
         raise SecretScanError(
             f"{tracked[0]} is tracked by git. It holds private terms and must never be "
@@ -126,7 +144,7 @@ def _from_worktree(root: Path, rel: str) -> Candidate | None:
 
 
 def tracked_files(root: Path) -> Iterator[Candidate]:
-    for rel in _split_z(_git(root, "ls-files", "-z")):
+    for rel in _split_z(git_output(root, "ls-files", "-z")):
         c = _from_worktree(root, rel)
         if c is not None:
             yield c
@@ -141,7 +159,7 @@ def changed_since(root: Path, ref: str) -> Iterator[Candidate]:
     """
     if ref.startswith("-"):
         raise SecretScanError("--since needs a git ref, not an option")
-    out = _git(root, "diff", "--name-only", "-z", "--diff-filter=ACMR", ref, "--")
+    out = git_output(root, "diff", "--name-only", "-z", "--diff-filter=ACMR", ref, "--")
     for rel in _split_z(out):
         c = _from_worktree(root, rel)
         if c is not None:
@@ -149,14 +167,14 @@ def changed_since(root: Path, ref: str) -> Iterator[Candidate]:
 
 
 def staged_files(root: Path) -> Iterator[Candidate]:
-    out = _git(root, "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR")
+    out = git_output(root, "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR")
     for rel in _split_z(out):
         spec = f":{rel}"
         try:
-            size = int(_git(root, "cat-file", "-s", spec).strip() or 0)
+            size = int(git_output(root, "cat-file", "-s", spec).strip() or 0)
         except (SecretScanError, ValueError):
             continue  # e.g. a submodule entry, which has no blob
-        yield Candidate(rel, size, partial(_git, root, "cat-file", "blob", spec))
+        yield Candidate(rel, size, partial(git_output, root, "cat-file", "blob", spec))
 
 
 def walk_paths(paths: list[Path], base: Path) -> Iterator[Candidate]:

@@ -51,6 +51,7 @@ Requires Python 3.10+.
 secret-scan                  # every file tracked by git (or the current directory, outside a repo)
 secret-scan --staged         # staged content only: what the next commit will contain
 secret-scan --since main     # files changed since a ref
+secret-scan --history        # every commit on every branch and tag: what was ever committed
 secret-scan path/ file.txt   # explicit files and directories
 ```
 
@@ -138,6 +139,62 @@ on GitHub. It contains:
 Like every other format, it never contains a matched value, and the repository is
 named by its directory, not its path on your machine. Set `SOURCE_DATE_EPOCH` to
 pin the timestamp.
+
+### Git history
+
+```bash
+secret-scan --history
+```
+
+Scans every commit on every branch, tag and remote-tracking branch, offline, and
+reports each secret once: the commit that added it, when, where, and whether
+`HEAD` still has it.
+
+```text
+$ secret-scan --history
+config/settings.py:4:17  aws-access-key-id  (20 chars)
+    An AWS access key ID is half of a usable credential and names the account it belongs to.
+    Committed in 1f0e3a9c2b7d on 2026-03-02; no longer in HEAD, but still in history.
+    What to do: Deactivate, then delete, the access key in IAM and check CloudTrail for its use. Prefer short-lived credentials: IAM roles, or OIDC federation from CI.
+
+✗ 1 finding in history (214 commits scanned), 0 still in HEAD. Values withheld.
+```
+
+Deleting a committed secret doesn't revoke it: every clone still has it. That's
+why history output says what to do about each finding. JSON adds `commit`, `date`
+(the committer date, in UTC) and `inHead` to each finding, plus a `history` object
+with the `HEAD` commit, the number of commits scanned and whether the clone is
+shallow. In history mode, file counts in the summary count changes: one file in
+one commit.
+
+How it decides:
+
+- **Once per secret.** A value is reported at the first commit that added it, even
+  if later commits edit the line or copy it into other files. To recognise a value
+  again without keeping it, each match gets a key: a hash under a random key that
+  exists only for this run. Private keys are compared by their whole block, since
+  every key of a type has the same header.
+- **What each commit added.** Each change is read as a diff with three lines of
+  context, so an inline allow on the line above still counts. A merge is scanned
+  for what it added itself, such as a conflict resolution; what it brings in from a
+  branch was scanned on that branch.
+- **Today's config, that commit's markers.** `allow`, `ignore` and `disable` from
+  the current `.secret-scan.json` apply to every commit. An inline allow counts in
+  the commits where the marker was present.
+- **In `HEAD`** means a rule matches the same value somewhere in `HEAD`'s committed
+  files, even where an exception excuses it: an excused value is still exposed.
+- **Repository settings can't hide content.** Every diff option that git config
+  could change (prefixes, colour, context lines, text conversion) is pinned, and a
+  file that `.gitattributes` marks as binary is read from the repository and
+  checked like any other file.
+- **Offline.** A partial clone (`git clone --filter`) is refused, because reading
+  its history would download objects. A shallow clone is scanned, and the output
+  says so: its oldest commit appears to add every file it has.
+
+Authors and commit messages aren't read or reported. The commit id leads to both,
+and names and email addresses are personal data the output doesn't need. History
+mode doesn't produce SARIF, GitHub annotations or the markdown report yet: the
+first two mark lines in the current files, and a secret in history may not be in them.
 
 ## Configuration
 
@@ -242,7 +299,8 @@ assignment rule hit the same text, only the specific one is reported.
 ## Permissions
 
 None. secret-scan reads files and runs read-only `git` commands (`ls-files`,
-`diff`, `cat-file`, `rev-parse`, `status`). It makes no network calls.
+`diff`, `cat-file`, `rev-parse`, `status`, and for `--history`, `log`, `ls-tree`
+and `config`). It makes no network calls.
 `--install-hook` is the only command that writes, and it refuses to replace an
 existing hook without `--force`.
 
@@ -267,6 +325,12 @@ also make the report useful to someone who has never seen the tool.
 hook is a common bug: it misses secrets that are staged but since edited away,
 and flags ones that are on disk but not being committed.
 
+**History is read as diffs, not as every version of every file.** Scanning each
+version would cost time in proportion to the size of every file at every commit;
+a diff costs time in proportion to what changed, and says which commit added a
+line. The trade is that a match must touch an added line to count, so a secret
+whose two halves arrive in different commits isn't recognised.
+
 **`--since` diffs the ref directly against the working tree**, not `base...HEAD`.
 That needs only the ref's commit, not a merge base, so it works on shallow CI
 checkouts as long as the base commit has been fetched.
@@ -288,7 +352,8 @@ files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
 |---|---|---|
 | Secret types | 21 rules, each with a written reason | 800+ detectors |
 | Checks whether a credential is live | No (no network calls) | Yes, against the provider's API |
-| Git history, orgs, S3, images | Current files only | Yes |
+| Git history | Yes, with `--history`: each secret once, and whether `HEAD` still has it | Yes |
+| GitHub orgs, S3, Docker images | No | Yes |
 | Encoded secrets (base64 and similar) | No | Yes |
 | Detector precision | Shape matching plus offline structural checks (key material after a key header, GitHub token checksums); looser, so more false positives | Structural checks (key pairs, parsed key bodies) |
 | Prints the matched value | Never | By default |
@@ -298,18 +363,20 @@ files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
 
 On TruffleHog's public canary repository (`trufflesecurity/test_keys`), secret-scan
 finds everything in the current files: the private key, the AWS key pair, and a
-URL with `admin:admin` credentials. CI checks this on every change. TruffleHog also
-finds a further secret in that repository's history, which secret-scan doesn't read.
+URL with `admin:admin` credentials. CI checks this on every change. With `--history`
+it also finds the AWS key pair that the repository's first commit added and a later
+one removed.
 
-If you need breadth, history or verification, use TruffleHog or gitleaks.
+If you need breadth or verification, use TruffleHog or gitleaks.
 secret-scan is the commit gate: it never echoes what it finds, treats personal
 data as a first-class concern, and keeps a rule set short enough to read in one
 sitting. Running it alongside one of them is reasonable.
 
 ## Limitations
 
-- It scans the current content of files, **not git history**. To check history,
-  use gitleaks or TruffleHog, or run secret-scan across checkouts.
+- Without `--history`, it scans the current content of files, not git history.
+- `--history` compares what each commit added. A secret split across commits, half
+  added in one and half in another, isn't seen as one value.
 - The generic `password = "…"` rule flags descriptive values in documentation, such as
   `SuperSecretToken`, on purpose: they look exactly like weak real passwords. Allow them
   with a reason.

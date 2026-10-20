@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "tool": {
+    "name": "secret-scan",
+    "version": "<version>"
+  },
+  "history": {
+    "head": "<commit-3>",
+    "commits": 3,
+    "shallow": false
+  },
+  "findings": [
+    {
+      "path": ".env",
+      "line": null,
+      "column": null,
+      "rule": "dotenv-file",
+      "why": "Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead.",
+      "fix": "Stop tracking it (git rm --cached), add it to .gitignore, rotate every secret it held, and commit a .env.example with placeholders instead.",
+      "length": 4,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 1,
+      "column": 11,
+      "rule": "github-token",
+      "why": "A GitHub token can read or write repositories and act as its owner.",
+      "fix": "Revoke the token (the owner's developer settings, or the organization's token settings), review the audit log for its use, and replace it with a GitHub App or the workflow's GITHUB_TOKEN where possible.",
+      "length": 40,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 2,
+      "column": 8,
+      "rule": "aws-access-key-id",
+      "why": "An AWS access key ID is half of a usable credential and names the account it belongs to.",
+      "fix": "Deactivate, then delete, the access key in IAM and check CloudTrail for its use. Prefer short-lived credentials: IAM roles, or OIDC federation from CI.",
+      "length": 20,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 3,
+      "column": 37,
+      "rule": "azure-storage-account-key",
+      "why": "A storage account shared key grants full control of the account and can't be scoped.",
+      "fix": "Regenerate the key on the storage account (the two keys can be rotated one at a time without downtime) and update its consumers. Prefer Microsoft Entra ID authorization, and disable shared key access where nothing needs it.",
+      "length": 88,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 4,
+      "column": 10,
+      "rule": "azure-entra-client-secret",
+      "why": "An Entra ID client secret lets anyone authenticate as the application.",
+      "fix": "Delete the secret from the app registration, check the service principal's sign-in logs, and move to a managed identity or workload identity federation where possible.",
+      "length": 40,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 5,
+      "column": 38,
+      "rule": "connection-string-password",
+      "why": "A password inside a connection string is a live database credential.",
+      "fix": "Change the password on the database, then load the connection string from configuration (a Key Vault reference, an environment variable) or use managed identity authentication.",
+      "length": 15,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "settings.py",
+      "line": 6,
+      "column": 11,
+      "rule": "anthropic-api-key",
+      "why": "An Anthropic API key is billed to its organization and can read its workspace data.",
+      "fix": "Delete the key in the Anthropic console, check the workspace's usage for activity you don't expect, and issue a replacement held in a secret store.",
+      "length": 106,
+      "commit": "<commit-1>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": false
+    },
+    {
+      "path": "deploy.sh",
+      "line": 1,
+      "column": 15,
+      "rule": "slack-token",
+      "why": "A Slack token grants workspace access as a bot or user.",
+      "fix": "Revoke it (Slack's auth.revoke method, or the app's OAuth settings) and keep the replacement in a secret store.",
+      "length": 42,
+      "commit": "<commit-3>",
+      "date": "2026-03-01T09:00:00Z",
+      "inHead": true
+    }
+  ],
+  "exceptions": [
+    {
+      "kind": "inline",
+      "source": "test_api.py:1",
+      "rule": "stripe-live-key",
+      "commit": "<commit-3>",
+      "reason": "test mode"
+    }
+  ],
+  "summary": {
+    "findings": 8,
+    "filesScanned": 5,
+    "skippedBinary": 0,
+    "skippedLarge": [],
+    "ignored": 0
+  }
+}
