@@ -137,11 +137,13 @@ def scan_text(
     markers would skip, to tell whether a value is still present at all.
     """
     lines = _Lines(text, first_line)
-    # (start, end, generic, finding)
-    hits: list[tuple[int, int, bool, Finding]] = []
-    # (start, end, generic, allow entry source or inline allow)
-    skipped: list[tuple[int, int, bool, str | InlineAllow]] = []
+    # (start, end, rank, finding)
+    hits: list[tuple[int, int, int, Finding]] = []
+    # (start, end, rank, allow entry source or inline allow)
+    skipped: list[tuple[int, int, int, str | InlineAllow]] = []
     for rule in settings.content_rules:
+        if not rule.applies_to(path):
+            continue
         for m in rule.pattern.finditer(text):
             start, end = rule.secret_span(m)
             if end <= start:
@@ -165,7 +167,7 @@ def scan_text(
                     (a.source for a in settings.allow if a.matches(rule.id, path, value)), None
                 )
                 if allowed_by is not None:
-                    skipped.append((start, end, rule.generic, allowed_by))
+                    skipped.append((start, end, rule.rank, allowed_by))
                     continue
             note = ""
             marker = _inline_allow(lines, line_no) if exceptions else None
@@ -173,27 +175,25 @@ def scan_text(
                 # A reason that runs over the match would repeat the value.
                 overlaps = marker.start < end and start < marker.end
                 reason = WITHHELD_REASON if overlaps else settings.safe_reason(marker.reason)
-                skipped.append(
-                    (start, end, rule.generic, InlineAllow(path, line_no, rule.id, reason))
-                )
+                skipped.append((start, end, rule.rank, InlineAllow(path, line_no, rule.id, reason)))
                 continue
             if marker is not None:
                 note = "inline allow ignored: add a reason after secret-scan:allow"
             hits.append(
-                (start, end, rule.generic, Finding(path, line_no, col, rule.id, end - start, note))
+                (start, end, rule.rank, Finding(path, line_no, col, rule.id, end - start, note))
             )
 
-    specific = [(s, e) for s, e, generic, _ in hits if not generic]
+    # A finding is dropped when a better-ranked rule matches overlapping text.
     findings = [
         f
-        for s, e, generic, f in hits
-        if not (generic and any(s < se and ss < e for ss, se in specific))
+        for s, e, rank, f in hits
+        if not any(r < rank and s < he and hs < e for hs, he, r, _ in hits)
     ]
     if record is not None:
         # The same overlap rule, so one skipped value isn't counted twice.
-        covered = specific + [(s, e) for s, e, generic, _ in skipped if not generic]
-        for s, e, generic, by in skipped:
-            if generic and any(s < ce and cs < e for cs, ce in covered):
+        covered = [(s, e, r) for s, e, r, _ in hits] + [(s, e, r) for s, e, r, _ in skipped]
+        for s, e, rank, by in skipped:
+            if any(r < rank and s < ce and cs < e for cs, ce, r in covered):
                 continue
             if isinstance(by, str):
                 record.applied[by] += 1

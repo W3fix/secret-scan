@@ -322,6 +322,7 @@ def rule_set_fingerprint(settings: Settings) -> str:
                 repr(r.min_entropy),
                 r.line_requires.pattern if r.line_requires else "",
                 r.well_formed.__name__ if r.well_formed else "",
+                r.files.pattern if r.files else "",
             ]
         h.update("\0".join(parts).encode() + b"\n")
     return "sha256:" + h.hexdigest()[:16]

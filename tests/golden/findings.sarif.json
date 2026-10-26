@@ -316,6 +316,96 @@
               }
             },
             {
+              "id": "kubeconfig-client-key",
+              "shortDescription": {
+                "text": "A kubeconfig's client-key-data is the private key its user signs in to the cluster with, often as an administrator."
+              },
+              "help": {
+                "text": "Kubernetes can't revoke a client certificate: remove the role bindings for its user and groups, rotate the cluster's certificate authority if the certificate is in an administrators group, and use short-lived credentials from an identity provider instead of embedded keys."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "kubeconfig-token",
+              "shortDescription": {
+                "text": "A token or password in a kubeconfig signs in to the cluster as its user."
+              },
+              "help": {
+                "text": "Revoke the token or change the password where it was issued, stop tracking the file, and use short-lived credentials from an identity provider instead of embedded ones."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "npmrc-auth",
+              "shortDescription": {
+                "text": "An .npmrc auth entry holds a registry token or password that can install, and often publish, packages as its owner."
+              },
+              "help": {
+                "text": "Revoke the token or change the password at the registry, then reference it from the environment (_authToken=${NPM_TOKEN}) instead of writing it into the file."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "pypirc-password",
+              "shortDescription": {
+                "text": "A .pypirc password or API token can upload packages to the index as its owner."
+              },
+              "help": {
+                "text": "Revoke the token at the package index, stop tracking the file, and supply the replacement at upload time from the environment or a keyring, or publish from CI with trusted publishing."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "docker-config-auth",
+              "shortDescription": {
+                "text": "A Docker client config's auth entry is a registry username and password (base64, not encrypted) or an identity token."
+              },
+              "help": {
+                "text": "Change the password or revoke the token at the registry, stop tracking the file, and sign in at runtime with a credential helper or the environment."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
               "id": "generic-assigned-secret",
               "shortDescription": {
                 "text": "A secret assigned inline as a literal is almost always a real one pasted in."
@@ -376,6 +466,24 @@
               },
               "help": {
                 "text": "Stop tracking it, replace the keys it holds, and keep key stores in a secret manager or key vault."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets"
+                ]
+              }
+            },
+            {
+              "id": "credential-store-file",
+              "shortDescription": {
+                "text": "Git credential stores and netrc files hold a plain-text password or token for every host they list."
+              },
+              "help": {
+                "text": "Stop tracking it (git rm --cached), add it to .gitignore, change every password or token it lists, and supply credentials at runtime from a credential helper or the environment."
               },
               "defaultConfiguration": {
                 "level": "error"

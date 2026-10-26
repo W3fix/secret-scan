@@ -308,15 +308,23 @@ replaced with a note rather than repeated.
 storage account keys · Azure SAS tokens · Entra ID client secrets ·
 connection-string passwords · credentials in URLs · GitHub, GitLab, Slack, npm
 tokens · Slack webhooks · live Stripe keys · Google API keys · Anthropic and
-OpenAI API keys · inline `api_key = "…"`-style assignments (with an entropy
-check).
+OpenAI API keys · kubeconfig client keys · inline `api_key = "…"`-style
+assignments (with an entropy check).
+
+**Credential files, by format:** auth entries in `.npmrc` (not `${NPM_TOKEN}`
+references) · passwords in `.pypirc` · `auth` entries in Docker client configs ·
+tokens and passwords in kubeconfig files. These rules run only on files with
+those names, where their keys mean a credential and nowhere else.
 
 **File names:** `.env` files (not `.env.example`) · Terraform state ·
-key stores and certificate bundles (`.pfx`, `.p12`, `.jks`, SSH identity files).
+key stores and certificate bundles (`.pfx`, `.p12`, `.jks`, SSH identity files) ·
+`.git-credentials` and `.netrc`.
 
 Values that are obviously placeholders (`your-key-here`, `${VAR}`, `<token>`,
 `EXAMPLE`, `xxxx`) are skipped. When a specific rule and the generic
-assignment rule hit the same text, only the specific one is reported.
+assignment rule hit the same text, only the specific one is reported. A
+provider's rule outranks a credential-file rule, which outranks the generic one:
+an npm token in `.npmrc` is reported as `npm-token`.
 
 ## Permissions
 
@@ -372,7 +380,7 @@ files (TruffleHog 3.99.0, `--no-verification`), here is how they differ:
 
 | | secret-scan | TruffleHog |
 |---|---|---|
-| Secret types | 21 rules, each with a written reason | 800+ detectors |
+| Secret types | 27 rules, each with a written reason | 800+ detectors |
 | Checks whether a credential is live | No (no network calls) | Yes, against the provider's API |
 | Git history | Yes, with `--history`: each secret once, and whether `HEAD` still has it | Yes |
 | GitHub orgs, S3, Docker images | No | Yes |

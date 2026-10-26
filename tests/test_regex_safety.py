@@ -40,6 +40,11 @@ HOSTILE: dict[str, str] = {
     "token prefixes": "ghp_" * (N // 4),
     "escaped newlines": "\\n" * (N // 2),
     "equals": "=" * N,
+    "npmrc keys": "//r/:_authToken=" * (N // 16),
+    "scoped colons": "a:" * (N // 2) + "_auth=",
+    "kubeconfig keys": "client-key-data: " * (N // 17),
+    "yaml tokens": "- token: " * (N // 9),
+    "docker auths": '"auth": "' * (N // 9),
 }
 
 

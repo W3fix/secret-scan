@@ -20,6 +20,8 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from secret_scan.globs import compile_glob
+
 #: How far past a key's header to look for its footer.
 _MAX_EXTENT = 64 * 1024
 
@@ -47,8 +49,25 @@ class Rule:
     #: Where the secret ends, when the span is only its start (a key's header).
     #: History compares secrets by their whole text, header to footer.
     ends_with: re.Pattern[str] | None = None
+    #: When set, the rule runs only on paths matching this: a credential file's
+    #: own format, whose keys mean nothing elsewhere.
+    files: re.Pattern[str] | None = None
     #: ``builtin``, ``config`` (repository config) or ``private`` (personal terms).
     origin: str = "builtin"
+
+    @property
+    def rank(self) -> int:
+        """Which finding wins when two rules match the same text: lowest first.
+
+        A provider's own rule says the most (what it is, how to revoke it), a
+        rule for one file format says more than a generic assignment does.
+        """
+        if not self.generic:
+            return 0
+        return 1 if self.files else 2
+
+    def applies_to(self, path: str) -> bool:
+        return self.files is None or self.files.match(path) is not None
 
     def secret_span(self, match: re.Match[str]) -> tuple[int, int]:
         if "secret" in match.re.groupindex and match.group("secret") is not None:
@@ -113,6 +132,7 @@ def _rule(
     line_requires: re.Pattern[str] | None = None,
     well_formed: Callable[[str], bool] | None = None,
     ends_with: str | None = None,
+    files: tuple[str, ...] = (),
 ) -> Rule:
     return Rule(
         rule_id,
@@ -125,6 +145,9 @@ def _rule(
         line_requires=line_requires,
         well_formed=well_formed,
         ends_with=re.compile(ends_with) if ends_with else None,
+        files=re.compile("|".join(f"(?:{compile_glob(g).pattern})" for g in files))
+        if files
+        else None,
     )
 
 
@@ -315,6 +338,68 @@ CONTENT_RULES: tuple[Rule, ...] = (
         r"|sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20})",
     ),
     _rule(
+        "kubeconfig-client-key",
+        "A kubeconfig's client-key-data is the private key its user signs in to the cluster "
+        "with, often as an administrator.",
+        "Kubernetes can't revoke a client certificate: remove the role bindings for its user "
+        "and groups, rotate the cluster's certificate authority if the certificate is in an "
+        "administrators group, and use short-lived credentials from an identity provider "
+        "instead of embedded keys.",
+        # A PEM key encoded again: hundreds of characters. kubectl's own redaction
+        # (DATA+OMITTED, REDACTED) is far shorter.
+        r"(?<![A-Za-z0-9_-])client-key-data:[ \t]*[\"']?(?P<secret>[A-Za-z0-9+/]{100,}={0,2})",
+    ),
+    _rule(
+        "kubeconfig-token",
+        "A token or password in a kubeconfig signs in to the cluster as its user.",
+        "Revoke the token or change the password where it was issued, stop tracking the file, "
+        "and use short-lived credentials from an identity provider instead of embedded ones.",
+        r"(?m)^[ \t]*(?:-[ \t]*)?(?:token|password|id-token|refresh-token|access-token)[ \t]*:"
+        r"[ \t]*[\"']?(?P<secret>[^\s\"'#]{8,})",
+        generic=True,
+        # These keys mean something else in any other YAML file.
+        files=(
+            "kubeconfig",
+            "kubeconfig.y*ml",
+            "*[-_.]kubeconfig",
+            "*[-_.]kubeconfig.y*ml",
+            "**/.kube/config",
+        ),
+    ),
+    _rule(
+        "npmrc-auth",
+        "An .npmrc auth entry holds a registry token or password that can install, and often "
+        "publish, packages as its owner.",
+        "Revoke the token or change the password at the registry, then reference it from the "
+        "environment (_authToken=${NPM_TOKEN}) instead of writing it into the file.",
+        # Registry-scoped (//host/:_authToken=) or global (_auth=).
+        r"(?m)^[ \t]*(?:[^\s=;#]*:)?(?:_authToken|_auth|_password)[ \t]*=[ \t]*[\"']?"
+        r"(?P<secret>[^\s;#\"']{8,})",
+        generic=True,
+        # Committing .npmrc is normal: registries and scopes. Only auth entries are secret.
+        files=(".npmrc",),
+    ),
+    _rule(
+        "pypirc-password",
+        "A .pypirc password or API token can upload packages to the index as its owner.",
+        "Revoke the token at the package index, stop tracking the file, and supply the "
+        "replacement at upload time from the environment or a keyring, or publish from CI "
+        "with trusted publishing.",
+        r"(?m)^[ \t]*password[ \t]*[:=][ \t]*(?P<secret>\S{8,})",
+        generic=True,
+        files=(".pypirc",),
+    ),
+    _rule(
+        "docker-config-auth",
+        "A Docker client config's auth entry is a registry username and password (base64, "
+        "not encrypted) or an identity token.",
+        "Change the password or revoke the token at the registry, stop tracking the file, and "
+        "sign in at runtime with a credential helper or the environment.",
+        r"\"(?:auth|identitytoken)\"[ \t]*:[ \t]*\"(?P<secret>[A-Za-z0-9+/=_.-]{8,})\"",
+        generic=True,
+        files=("**/.docker/config.json", ".dockercfg", "*.dockerconfigjson"),
+    ),
+    _rule(
         "generic-assigned-secret",
         "A secret assigned inline as a literal is almost always a real one pasted in.",
         "If it's a real credential, rotate it where it was issued and load it from the "
@@ -352,6 +437,15 @@ PATH_RULES: tuple[PathRule, ...] = (
         re.compile(r"(?:id_(?:rsa|dsa|ecdsa|ed25519)|[^/]+\.(?:pfx|p12|jks|keystore|kdbx))\Z"),
         fix="Stop tracking it, replace the keys it holds, and keep key stores in a secret "
         "manager or key vault.",
+    ),
+    PathRule(
+        "credential-store-file",
+        "Git credential stores and netrc files hold a plain-text password or token for every "
+        "host they list.",
+        re.compile(r"(?:\.git-credentials|[._]netrc)\Z"),
+        fix="Stop tracking it (git rm --cached), add it to .gitignore, change every password or "
+        "token it lists, and supply credentials at runtime from a credential helper or the "
+        "environment.",
     ),
 )
 
