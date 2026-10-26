@@ -9,7 +9,7 @@ it matched, never the matched text.
 - **Commit:** `<commit-3>` (HEAD)
 - **Scanned:** 2026-01-01 00:00 UTC
 - **Tool:** secret-scan <version>, rule set `sha256:<rule-set>`
-- **Rules:** 21 of 21 built-in
+- **Rules:** 27 of 27 built-in
 - **Coverage:** 5 changes scanned
 
 ## Findings by rule

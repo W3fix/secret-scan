@@ -119,3 +119,20 @@ def generic_value() -> str:
 
 def password() -> str:
     return "Tr0ub4dor" + chars(ALNUM, 6, seed=89)
+
+
+def kube_client_key() -> str:
+    """A kubeconfig's client-key-data: a PEM key, base64-encoded again."""
+    return chars(B64, 1600, seed=101) + "=="
+
+
+def bearer_token() -> str:
+    """A JWT-shaped token, as a service account or identity provider issues."""
+    return (
+        "ey" + "J" + chars(ALNUM, 35, seed=103) + ".ey" + "J" + chars(ALNUM + "_-", 120, seed=107)
+    )
+
+
+def docker_auth() -> str:
+    """A Docker config auth entry: base64 of user:password."""
+    return chars(B64, 28, seed=109) + "="

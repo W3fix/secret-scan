@@ -15,7 +15,13 @@ google-api-key               content  builtin  A Google API key is billed to its
 npm-token                    content  builtin  An npm token can publish packages as its owner: a direct supply-chain risk.
 anthropic-api-key            content  builtin  An Anthropic API key is billed to its organization and can read its workspace data.
 openai-api-key               content  builtin  An OpenAI API key is billed to its organization and can read its project data.
+kubeconfig-client-key        content  builtin  A kubeconfig's client-key-data is the private key its user signs in to the cluster with, often as an administrator.
+kubeconfig-token             content  builtin  A token or password in a kubeconfig signs in to the cluster as its user.
+npmrc-auth                   content  builtin  An .npmrc auth entry holds a registry token or password that can install, and often publish, packages as its owner.
+pypirc-password              content  builtin  A .pypirc password or API token can upload packages to the index as its owner.
+docker-config-auth           content  builtin  A Docker client config's auth entry is a registry username and password (base64, not encrypted) or an identity token.
 generic-assigned-secret      content  builtin  A secret assigned inline as a literal is almost always a real one pasted in.
 dotenv-file                  path     builtin  Dotenv files hold real environment secrets. Commit a .env.example with placeholders instead.
 terraform-state              path     builtin  Terraform state stores resource attributes in plain text, including generated passwords and keys. Use a remote backend.
 key-material-file            path     builtin  Key stores, certificate bundles and SSH identity files usually contain private keys.
+credential-store-file        path     builtin  Git credential stores and netrc files hold a plain-text password or token for every host they list.

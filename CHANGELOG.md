@@ -5,7 +5,7 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 ## [Unreleased]
 
 ### Added
-- Scanner with 18 content rules and 3 file-name rules, each with a written reason.
+- Scanner with 23 content rules and 4 file-name rules, each with a written reason.
 - Scan modes: tracked files (default), `--staged` (reads the git index), `--since REF`, explicit paths.
 - Private terms from `~/.config/secret-scan/private.json`, a git-ignored `.secret-scan.local.json`,
   or `SECRET_SCAN_PRIVATE_TERMS`. The scanner refuses to run if the local file is tracked.
@@ -32,5 +32,9 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
   input runs it: a pull request that adds a secret and removes it in a later commit
   leaves its files clean but its history not. CI checks both, and the benchmark now
   includes the canary repository's history.
+- Credential files: `.git-credentials` and `.netrc` by name; auth entries in `.npmrc`,
+  passwords in `.pypirc`, Docker config `auth` entries, and kubeconfig client keys,
+  tokens and passwords. Rules can be limited to file names, so a key that means a
+  credential in one format stays quiet everywhere else.
 - Rules can carry a structural check. `github-token` uses GitHub's built-in checksum, so
   token-shaped strings GitHub never issued (test data, minified code) no longer match.

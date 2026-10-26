@@ -105,6 +105,44 @@ POSITIVES: list[tuple[str, Callable[[], str]]] = [
 ]
 
 
+# Rules for one file format: (rule, path, content).
+SCOPED_POSITIVES: list[tuple[str, str, Callable[[], str]]] = [
+    (
+        "kubeconfig-client-key",
+        "anywhere.yaml",
+        lambda: f"    client-key-data: {fakes.kube_client_key()}\n",
+    ),
+    ("kubeconfig-token", "kubeconfig", lambda: f"    token: {fakes.bearer_token()}\n"),
+    ("kubeconfig-token", "ops/.kube/config", lambda: f"    password: {fakes.password()}\n"),
+    (
+        "kubeconfig-token",
+        "clusters/prod-kubeconfig.yaml",
+        lambda: f"      id-token: {fakes.bearer_token()}\n",
+    ),
+    (
+        "npmrc-auth",
+        "web/.npmrc",
+        lambda: f"//registry.example.org/:_authToken={fakes.generic_value()}\n",
+    ),
+    ("npmrc-auth", ".npmrc", lambda: f"_auth = {fakes.docker_auth()}\n"),
+    (
+        "pypirc-password",
+        ".pypirc",
+        lambda: f"[pypi]\nusername = __token__\npassword = {fakes.generic_value()}\n",
+    ),
+    (
+        "docker-config-auth",
+        "ci/.docker/config.json",
+        lambda: '{"auths": {"registry.example.org": {"auth": "' + fakes.docker_auth() + '"}}}',
+    ),
+    (
+        "docker-config-auth",
+        "deploy/pull.dockerconfigjson",
+        lambda: '{"auths": {"r": {"identitytoken": "' + fakes.bearer_token() + '"}}}',
+    ),
+]
+
+
 @pytest.mark.parametrize(("rule", "make"), POSITIVES, ids=[r for r, _ in POSITIVES])
 def test_rule_fires(rule: str, make: Callable[[], str], tmp_path: Path) -> None:
     assert rule in rules_hit(make(), tmp_path)
@@ -118,8 +156,64 @@ def test_every_builtin_rule_says_what_to_do() -> None:
 
 
 def test_every_content_rule_has_a_positive_case() -> None:
-    covered = {r for r, _ in POSITIVES}
+    covered = {r for r, _ in POSITIVES} | {r for r, _, _ in SCOPED_POSITIVES}
     assert {r.id for r in CONTENT_RULES} <= covered
+
+
+def rules_hit_in(path: str, text: str, tmp_path: Path) -> list[str]:
+    settings = load_settings(tmp_path, use_user_file=False, environ={})
+    return [f.rule for f in scan_text(path, text, settings)]
+
+
+@pytest.mark.parametrize(
+    ("rule", "path", "make"), SCOPED_POSITIVES, ids=[f"{r}:{p}" for r, p, _ in SCOPED_POSITIVES]
+)
+def test_scoped_rule_fires(rule: str, path: str, make: Callable[[], str], tmp_path: Path) -> None:
+    assert rules_hit_in(path, make(), tmp_path) == [rule]
+
+
+@pytest.mark.parametrize(
+    ("rule", "path", "make"),
+    [p for p in SCOPED_POSITIVES if p[0] != "kubeconfig-client-key"],
+    ids=[f"{r}:{p}" for r, p, _ in SCOPED_POSITIVES if r != "kubeconfig-client-key"],
+)
+def test_scoped_rule_quiet_in_other_files(
+    rule: str, path: str, make: Callable[[], str], tmp_path: Path
+) -> None:
+    for other in ("README.md", "values.yaml", "src/kubeconfig.go", "npmrc.md", "config.json"):
+        assert rule not in rules_hit_in(other, make(), tmp_path), other
+
+
+@pytest.mark.parametrize(
+    ("path", "text"),
+    [
+        ("kubeconfig", "    token: REDACTED\n"),  # kubectl config view
+        ("kubeconfig", "    client-key-data: DATA+OMITTED\n"),
+        ("kubeconfig", "    token: ${KUBE_TOKEN}\n"),
+        ("kubeconfig", "    token-file: /var/run/secrets/token\n"),  # a path, not a token
+        ("kubeconfig", "      command: kubelogin\n"),
+        (".npmrc", "//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n"),
+        (".npmrc", "@contoso:registry=https://npm.example.org/\n"),
+        (".npmrc", "always-auth=true\n"),
+        (".pypirc", "[pypi]\nusername = __token__\n"),
+        (".pypirc", "password = <your token>\n"),
+        (".docker/config.json", '{"credsStore": "desktop", "auths": {"r": {}}}'),
+        (".docker/config.json", '{"auths": {"r": {"auth": ""}}}'),
+    ],
+)
+def test_credential_file_look_alikes_stay_quiet(path: str, text: str, tmp_path: Path) -> None:
+    assert rules_hit_in(path, text, tmp_path) == []
+
+
+def test_provider_rule_wins_in_a_credential_file(tmp_path: Path) -> None:
+    text = f"//registry.npmjs.org/:_authToken={fakes.npm_token()}\n"
+    assert rules_hit_in(".npmrc", text, tmp_path) == ["npm-token"]
+
+
+def test_credential_file_rule_wins_over_generic(tmp_path: Path) -> None:
+    text = f'    password: "{fakes.generic_value()}"\n'
+    assert rules_hit_in("f.yaml", text, tmp_path) == ["generic-assigned-secret"]
+    assert rules_hit_in("kubeconfig", text, tmp_path) == ["kubeconfig-token"]
 
 
 @pytest.mark.parametrize(
@@ -196,6 +290,9 @@ def test_placeholder_detection() -> None:
         ("terraform.tfstate.1700000000.backup", "terraform-state"),
         ("certs/site.pfx", "key-material-file"),
         ("home/id_ed25519", "key-material-file"),
+        (".git-credentials", "credential-store-file"),
+        ("home/.netrc", "credential-store-file"),
+        ("_netrc", "credential-store-file"),
     ],
 )
 def test_path_rules_fire(name: str, rule: str, tmp_path: Path) -> None:
@@ -206,7 +303,18 @@ def test_path_rules_fire(name: str, rule: str, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "name", [".env.example", ".env.sample", ".envrc", "id_rsa.pub", "main.tf", "variables.tfvars"]
+    "name",
+    [
+        ".env.example",
+        ".env.sample",
+        ".envrc",
+        "id_rsa.pub",
+        "main.tf",
+        "variables.tfvars",
+        "netrc.py",
+        ".git-credentials.example",
+        ".gitconfig",
+    ],
 )
 def test_path_rules_quiet(name: str, tmp_path: Path) -> None:
     from secret_scan.scanner import scan_path_rules

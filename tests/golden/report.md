@@ -9,7 +9,7 @@ it matched, never the matched text.
 - **Commit:** `<commit>`, plus uncommitted changes in the working tree
 - **Scanned:** 2026-01-01 00:00 UTC
 - **Tool:** secret-scan <version>, rule set `sha256:<rule-set>`
-- **Rules:** 20 of 21 built-in, private terms from 1 source (not listed)
+- **Rules:** 26 of 27 built-in, private terms from 1 source (not listed)
 - **Coverage:** 6 files scanned; 1 file over 4,096 bytes checked by name only; 2 files excluded by `ignore` entries
 
 ## Findings by rule
